@@ -6,6 +6,7 @@ import {
 } from './utils'
 import Statistiche from './Statistiche.jsx'
 import ExportModal from './ExportModal.jsx'
+import FerieModal from './FerieModal.jsx'
 import styles from './TurniGrid.module.css'
 
 const FESTIVI = new Set(['04-25','05-01','06-02','08-15','11-01','12-08','12-24','12-25','12-26','12-31'])
@@ -33,6 +34,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()))
   const [syncStatus, setSyncStatus] = useState({ msg: '', cls: '' })
   const [showExport, setShowExport] = useState(false)
+  const [showFerie, setShowFerie] = useState(false)
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
 
@@ -94,6 +96,21 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     setNotes(prev => ({ ...prev, [weekKey]: val }))
     clearTimeout(noteSaveTimer.current)
     noteSaveTimer.current = setTimeout(() => saveNote(weekKey, val), 800)
+  }
+
+  async function applyFerie(records) {
+    setSyncStatus({ msg: 'Salvataggio ferie...', cls: '' })
+    // Aggiorna stato locale immediatamente
+    setData(prev => {
+      const next = { ...prev }
+      records.forEach(({ key, val }) => { next[key] = val })
+      return next
+    })
+    // Salva su Supabase in batch
+    const rows = records.map(({ key, val }) => ({ chiave: key, valore: val }))
+    const { error } = await supabase.from('turni').upsert(rows, { onConflict: 'chiave' })
+    if (error) { setSyncStatus({ msg: 'Errore salvataggio ✗', cls: styles.err }); return }
+    setSyncStatus({ msg: 'Ferie salvate ✓', cls: styles.ok })
   }
 
   const days = getWeekDays(currentMonday)
@@ -253,8 +270,11 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             </div>
           )}
 
-          {/* EXPORT */}
+          {/* EXPORT + FERIE */}
           <div className={styles.exportBar}>
+            {isAdmin && mode === 'admin' && (
+              <button className={styles.ferieBtn} onClick={() => setShowFerie(true)}>🏖 Imposta FERIE</button>
+            )}
             <button className={styles.exportBtn} onClick={() => setShowExport(true)}>⬇ Scarica turni (.xls)</button>
           </div>
         </>
@@ -262,6 +282,9 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
       {showExport && (
         <ExportModal data={data} currentMonday={currentMonday} onClose={() => setShowExport(false)} />
+      )}
+      {showFerie && (
+        <FerieModal currentMonday={currentMonday} onClose={() => setShowFerie(false)} onApply={applyFerie} />
       )}
     </div>
   )
