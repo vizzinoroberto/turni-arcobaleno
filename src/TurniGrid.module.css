@@ -279,3 +279,104 @@
 /* ROW HEIGHTS */
 .rowPranzo td { height: 26px; vertical-align: middle; }
 .rowCena td { height: 22px; vertical-align: middle; }
+
+/* MAIN TABS */
+.mainTabs {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mainTab {
+  padding: 5px 18px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f5f5f5;
+  color: #666;
+  border: none;
+  cursor: pointer;
+  border-right: 1px solid #ccc;
+}
+
+.mainTab:last-child { border-right: none; }
+.mainTab:hover { background: #ebebeb; }
+.mainTabActive { background: #222; color: #fff; }
+
+/* NOTE */
+.noteBox {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.noteLabel {
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+}
+
+.noteInput {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  color: #333;
+  line-height: 1.5;
+}
+
+.noteInput:focus { border-color: #4a90d9; }
+
+.noteDisplay {
+  background: #fffbea;
+  border: 1px solid #f0d060;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.noteDisplayLabel {
+  font-size: 12px;
+  font-weight: bold;
+  color: #856404;
+}
+
+.noteDisplayText {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* EXPORT BAR */
+.exportBar {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.exportBtn {
+  padding: 7px 18px;
+  font-size: 13px;
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.exportBtn:hover { background: #1e8449; }

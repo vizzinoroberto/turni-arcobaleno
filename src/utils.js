@@ -1,4 +1,5 @@
-export const PASSWORD = 'Arco2026'
+export const PASSWORD_ADMIN = 'Arco2026'
+export const PASSWORD_STAFF = 'arcoturni'
 
 export const EMPLOYEES = [
   'Francesca Novello',
@@ -12,19 +13,11 @@ export const EMPLOYEES = [
 
 export const DOW_LABELS = ['D', 'L', 'M', 'M', 'G', 'V', 'S']
 
-export const PRANZO_MAP = {
-  Q: '11:30',
-  W: '12:00',
-}
+export const PRANZO_MAP = { Q: '11:30', W: '12:00' }
 
 export const CENA_MAP = {
-  '1': '18:00',
-  '2': '18:00',
-  '3': '18:30',
-  '4': '18:30',
-  '5': '19:00',
-  '6': '19:30',
-  '7': '19:30',
+  '1': '18:00', '2': '18:00', '3': '18:30', '4': '18:30',
+  '5': '19:00', '6': '19:30', '7': '19:30',
 }
 
 export function getMonday(d) {
@@ -42,9 +35,7 @@ export function addDays(d, n) {
   return r
 }
 
-export function toDateStr(d) {
-  return d.toISOString().slice(0, 10)
-}
+export function toDateStr(d) { return d.toISOString().slice(0, 10) }
 
 export function formatDateVertical(d) {
   const dd = String(d.getDate()).padStart(2, '0')
@@ -53,17 +44,10 @@ export function formatDateVertical(d) {
   return `${dd}/${mm}/${yy}`
 }
 
-export function formatDateShort(d) {
-  return `${d.getDate()}/${d.getMonth() + 1}`
-}
+export function formatDateShort(d) { return `${d.getDate()}/${d.getMonth() + 1}` }
 
-export function isWeekend(d) {
-  return d.getDay() === 6 || d.getDay() === 0
-}
-
-export function isSunday(d) {
-  return d.getDay() === 0
-}
+export function isWeekend(d) { return d.getDay() === 6 || d.getDay() === 0 }
+export function isSunday(d) { return d.getDay() === 0 }
 
 export function getWeekDays(monday) {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
