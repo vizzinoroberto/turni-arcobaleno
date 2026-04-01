@@ -1,0 +1,395 @@
+.app {
+  padding: 14px;
+  min-height: 100vh;
+}
+
+/* TOP BAR */
+.topBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.titleText {
+  font-size: 15px;
+  font-weight: bold;
+  color: #222;
+}
+
+.navBtn {
+  padding: 5px 12px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background: #fff;
+  color: #222;
+}
+
+.navBtn:hover {
+  background: #f0f0f0;
+}
+
+.weekLabel {
+  font-size: 12px;
+  color: #555;
+  font-weight: 600;
+  min-width: 170px;
+  text-align: center;
+}
+
+.modeToggle {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.modeBtn {
+  padding: 5px 14px;
+  font-size: 12px;
+  background: #fff;
+  color: #555;
+  border: none;
+}
+
+.modeBtn.active {
+  background: #4a90d9;
+  color: #fff;
+  font-weight: bold;
+}
+
+.syncStatus {
+  font-size: 11px;
+  color: #aaa;
+  margin-left: auto;
+}
+
+.ok { color: #27ae60; }
+.err { color: #c0392b; }
+
+.logoutBtn {
+  font-size: 11px;
+  color: #888;
+  background: none;
+  border: none;
+  text-decoration: underline;
+}
+
+.logoutBtn:hover { color: #555; }
+
+/* STAFF NOTE */
+.staffNote {
+  background: #e8f4fd;
+  border: 1px solid #bee3f8;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #2c5282;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.refreshBtn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid #4a90d9;
+  border-radius: 5px;
+  background: #fff;
+  color: #4a90d9;
+}
+
+.refreshBtn:hover { background: #e8f4fd; }
+
+/* TABLE */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  border: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+.colName {
+  min-width: 140px;
+  width: 140px;
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: #fafafa;
+}
+
+.hdr {
+  font-weight: bold;
+  color: #555;
+  font-size: 11px;
+  background: #f0f0f0;
+}
+
+.dayHeader {
+  background: #f0f0f0;
+  width: 38px;
+  min-width: 38px;
+  padding: 6px 4px;
+  vertical-align: bottom;
+}
+
+.dateVertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-size: 11px;
+  font-weight: bold;
+  color: #222;
+  display: block;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.dow {
+  font-size: 11px;
+  font-weight: bold;
+  color: #666;
+  display: block;
+  margin-top: 4px;
+}
+
+.dow.weekend {
+  color: #c0392b;
+}
+
+.pcHeader {
+  font-size: 9px;
+  color: #888;
+  padding: 2px;
+  background: #f5f5f5;
+  width: 38px;
+}
+
+.cellPair {
+  padding: 2px;
+  width: 38px;
+}
+
+.weekendCol { background: #fafafa; }
+.sundayCol { background: #fff5f5; }
+
+.rowPranzo td { border-bottom: none; }
+.rowCena td { border-top: 1px dashed #e0e0e0; }
+
+.cellDisplay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.timeStr {
+  font-size: 11px;
+  font-weight: bold;
+  color: #222;
+}
+
+.shiftNum {
+  font-size: 10px;
+  color: #888;
+}
+
+.ferieBadge {
+  font-size: 9px;
+  background: #fef3cd;
+  color: #856404;
+  border-radius: 3px;
+  padding: 1px 3px;
+  font-weight: bold;
+  border: 1px solid #ffc107;
+}
+
+.emptyCell {
+  color: #ccc;
+  font-size: 10px;
+}
+
+.shiftInput {
+  width: 34px;
+  font-size: 11px;
+  padding: 1px 0;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #fff;
+  color: #222;
+  cursor: pointer;
+}
+
+.shiftInput:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.hasValue {
+  background: #e8f0fe;
+  color: #1a56db;
+  border-color: #93c5fd;
+}
+
+.hasFerie {
+  background: #fef3cd;
+  color: #856404;
+  border-color: #ffc107;
+}
+
+/* LEGENDA */
+.legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  align-items: center;
+  font-size: 11px;
+  color: #666;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+.legend strong {
+  color: #333;
+}
+
+/* ROW HEIGHTS */
+.rowPranzo td { height: 26px; vertical-align: middle; }
+.rowCena td { height: 22px; vertical-align: middle; }
+
+/* MAIN TABS */
+.mainTabs {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mainTab {
+  padding: 5px 18px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f5f5f5;
+  color: #666;
+  border: none;
+  cursor: pointer;
+  border-right: 1px solid #ccc;
+}
+
+.mainTab:last-child { border-right: none; }
+.mainTab:hover { background: #ebebeb; }
+.mainTabActive { background: #222; color: #fff; }
+
+/* NOTE */
+.noteBox {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.noteLabel {
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+}
+
+.noteInput {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  color: #333;
+  line-height: 1.5;
+}
+
+.noteInput:focus { border-color: #4a90d9; }
+
+.noteDisplay {
+  background: #fffbea;
+  border: 1px solid #f0d060;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.noteDisplayLabel {
+  font-size: 12px;
+  font-weight: bold;
+  color: #856404;
+}
+
+.noteDisplayText {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* EXPORT BAR */
+.exportBar {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.exportBtn {
+  padding: 7px 18px;
+  font-size: 13px;
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.exportBtn:hover { background: #1e8449; }
+
+.ferieBtn {
+  padding: 7px 18px;
+  font-size: 13px;
+  background: #e67e22;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.ferieBtn:hover { background: #ca6f1e; }
