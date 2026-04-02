@@ -39,6 +39,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const noteSaveTimer = useRef(null)
 
   const weekKey = toDateStr(currentMonday)
+  // Coda modifiche pendenti: { key -> val } (val='' significa cancella)
+  const pendingRef = useRef({})
 
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
@@ -61,26 +63,71 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
   useEffect(() => { loadData() }, [loadData])
 
-  async function saveCell(key, val) {
-    if (val) {
-      const { error } = await supabase.from('turni').upsert({ chiave: key, valore: val }, { onConflict: 'chiave' })
-      if (error) { setSyncStatus({ msg: 'Errore salvataggio ✗', cls: styles.err }); return }
+  // Salva tutto prima di cambiare settimana o chiudere la pagina
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (Object.keys(pendingRef.current).length > 0) flushPending()
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  // Flush quando si cambia settimana con modifiche in sospeso
+  function changeWeek(fn) {
+    if (Object.keys(pendingRef.current).length > 0) {
+      clearTimeout(saveTimer.current)
+      flushPending().then(() => setCurrentMonday(fn))
     } else {
-      const { error } = await supabase.from('turni').delete().eq('chiave', key)
-      if (error) { setSyncStatus({ msg: 'Errore salvataggio ✗', cls: styles.err }); return }
+      setCurrentMonday(fn)
+    }
+  }
+
+  // Flush: salva tutte le modifiche pendenti in un unico batch
+  async function flushPending() {
+    const batch = { ...pendingRef.current }
+    if (Object.keys(batch).length === 0) return
+    pendingRef.current = {}
+
+    setSyncStatus({ msg: 'Salvataggio...', cls: '' })
+
+    const toUpsert = []
+    const toDelete = []
+    Object.entries(batch).forEach(([key, val]) => {
+      if (val) toUpsert.push({ chiave: key, valore: val })
+      else toDelete.push(key)
+    })
+
+    const ops = []
+    if (toUpsert.length > 0)
+      ops.push(supabase.from('turni').upsert(toUpsert, { onConflict: 'chiave' }))
+    if (toDelete.length > 0)
+      ops.push(supabase.from('turni').delete().in('chiave', toDelete))
+
+    const results = await Promise.all(ops)
+    const hasError = results.some(r => r.error)
+    if (hasError) {
+      setSyncStatus({ msg: 'Errore salvataggio ✗', cls: styles.err })
+      // Rimette in coda le modifiche fallite per riprovare
+      Object.entries(batch).forEach(([k, v]) => { pendingRef.current[k] = v })
+      return
     }
     setSyncStatus({ msg: 'Salvato ✓', cls: styles.ok })
   }
 
   function handleChange(key, val) {
+    // Aggiorna UI immediatamente
     setData(prev => {
       const next = { ...prev }
       if (val) next[key] = val
       else delete next[key]
       return next
     })
+    // Accumula in coda — sovrascrive eventuali valori precedenti per la stessa cella
+    pendingRef.current[key] = val
+    setSyncStatus({ msg: 'Modifiche in attesa...', cls: '' })
+    // Debounce: aspetta 1.5s di inattività poi salva tutto insieme
     clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => saveCell(key, val), 600)
+    saveTimer.current = setTimeout(flushPending, 1500)
   }
 
   async function saveNote(wk, testo) {
@@ -165,9 +212,9 @@ export default function TurniGrid({ isAdmin, onLogout }) {
         )}
 
         {tab === 'turni' && <>
-          <button className={styles.navBtn} onClick={() => setCurrentMonday(m => addDays(m,-7))}>←</button>
+          <button className={styles.navBtn} onClick={() => changeWeek(m => addDays(m,-7))}>←</button>
           <span className={styles.weekLabel}>{formatDateFull(days[0])} – {formatDateFull(days[6])}</span>
-          <button className={styles.navBtn} onClick={() => setCurrentMonday(m => addDays(m,7))}>→</button>
+          <button className={styles.navBtn} onClick={() => changeWeek(m => addDays(m,7))}>→</button>
         </>}
 
         {isAdmin && tab === 'turni' && (
