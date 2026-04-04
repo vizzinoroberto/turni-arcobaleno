@@ -98,11 +98,8 @@ function buildAndDownloadPDF(data, from, to, employees) {
   })
   if (currentWeek.length > 0) weeks.push(currentWeek) // settimana incompleta finale
 
-  // Raggruppa settimane in chunk da max 2
-  const chunks = []
-  for (let i = 0; i < weeks.length; i += 2) {
-    chunks.push(weeks.slice(i, i + 2).flat())
-  }
+  // 1 settimana per pagina = sempre max 7 colonne, orari sempre leggibili
+  const chunks = weeks
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const pageW = 277
