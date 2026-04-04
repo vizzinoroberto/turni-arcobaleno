@@ -11,7 +11,6 @@ import styles from './TurniGrid.module.css'
 
 const FESTIVI = new Set(['04-25','05-01','06-02','08-15','11-01','12-08','12-24','12-25','12-26','12-31'])
 
-// Colore di sfondo leggero per ogni dipendente (stesso ordine di EMPLOYEES)
 const EMP_COLORS = [
   { bg: '#DBEAFE', border: '#93C5FD' }, // azzurro   - Francesca
   { bg: '#D1FAE5', border: '#6EE7B7' }, // verde     - Benedetta
@@ -37,10 +36,18 @@ function formatDateFull(d) {
   return `${dd}/${mm}/${yy}`
 }
 
+// Scurisce leggermente il colore hex per weekend/domenica
+function darken(hex, amount) {
+  const r = Math.max(0, parseInt(hex.slice(1,3),16) - amount)
+  const g = Math.max(0, parseInt(hex.slice(3,5),16) - amount)
+  const b = Math.max(0, parseInt(hex.slice(5,7),16) - amount)
+  return `rgb(${r},${g},${b})`
+}
+
 export default function TurniGrid({ isAdmin, onLogout }) {
   const [data, setData] = useState({})
-  const [notes, setNotes] = useState({}) // weekKey -> testo
-  const [tab, setTab] = useState('turni') // 'turni' | 'statistiche'
+  const [notes, setNotes] = useState({})
+  const [tab, setTab] = useState('turni')
   const [mode, setMode] = useState(isAdmin ? 'admin' : 'staff')
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()))
   const [syncStatus, setSyncStatus] = useState({ msg: '', cls: '' })
@@ -48,10 +55,10 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showFerie, setShowFerie] = useState(false)
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
+  const pendingRef = useRef({})
 
   const weekKey = toDateStr(currentMonday)
-  // Coda modifiche pendenti: { key -> val } (val='' significa cancella)
-  const pendingRef = useRef({})
+  const days = getWeekDays(currentMonday)
 
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
@@ -59,10 +66,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       supabase.from('turni').select('chiave, valore'),
       supabase.from('note_settimana').select('settimana, testo')
     ])
-    if (error || noteErr) {
-      setSyncStatus({ msg: 'Errore caricamento ✗', cls: styles.err })
-      return
-    }
+    if (error || noteErr) { setSyncStatus({ msg: 'Errore caricamento ✗', cls: styles.err }); return }
     const obj = {}
     rows.forEach(r => { obj[r.chiave] = r.valore })
     setData(obj)
@@ -74,16 +78,34 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Salva tutto prima di cambiare settimana o chiudere la pagina
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (Object.keys(pendingRef.current).length > 0) flushPending()
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    const fn = () => { if (Object.keys(pendingRef.current).length > 0) flushPending() }
+    window.addEventListener('beforeunload', fn)
+    return () => window.removeEventListener('beforeunload', fn)
   }, [])
 
-  // Flush quando si cambia settimana con modifiche in sospeso
+  async function flushPending() {
+    const batch = { ...pendingRef.current }
+    if (Object.keys(batch).length === 0) return
+    pendingRef.current = {}
+    setSyncStatus({ msg: 'Salvataggio...', cls: '' })
+    const toUpsert = [], toDelete = []
+    Object.entries(batch).forEach(([key, val]) => {
+      if (val) toUpsert.push({ chiave: key, valore: val })
+      else toDelete.push(key)
+    })
+    const ops = []
+    if (toUpsert.length > 0) ops.push(supabase.from('turni').upsert(toUpsert, { onConflict: 'chiave' }))
+    if (toDelete.length > 0) ops.push(supabase.from('turni').delete().in('chiave', toDelete))
+    const results = await Promise.all(ops)
+    if (results.some(r => r.error)) {
+      setSyncStatus({ msg: 'Errore salvataggio ✗', cls: styles.err })
+      Object.entries(batch).forEach(([k, v]) => { pendingRef.current[k] = v })
+      return
+    }
+    setSyncStatus({ msg: 'Salvato ✓', cls: styles.ok })
+  }
+
   function changeWeek(fn) {
     if (Object.keys(pendingRef.current).length > 0) {
       clearTimeout(saveTimer.current)
@@ -93,50 +115,15 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     }
   }
 
-  // Flush: salva tutte le modifiche pendenti in un unico batch
-  async function flushPending() {
-    const batch = { ...pendingRef.current }
-    if (Object.keys(batch).length === 0) return
-    pendingRef.current = {}
-
-    setSyncStatus({ msg: 'Salvataggio...', cls: '' })
-
-    const toUpsert = []
-    const toDelete = []
-    Object.entries(batch).forEach(([key, val]) => {
-      if (val) toUpsert.push({ chiave: key, valore: val })
-      else toDelete.push(key)
-    })
-
-    const ops = []
-    if (toUpsert.length > 0)
-      ops.push(supabase.from('turni').upsert(toUpsert, { onConflict: 'chiave' }))
-    if (toDelete.length > 0)
-      ops.push(supabase.from('turni').delete().in('chiave', toDelete))
-
-    const results = await Promise.all(ops)
-    const hasError = results.some(r => r.error)
-    if (hasError) {
-      setSyncStatus({ msg: 'Errore salvataggio ✗', cls: styles.err })
-      // Rimette in coda le modifiche fallite per riprovare
-      Object.entries(batch).forEach(([k, v]) => { pendingRef.current[k] = v })
-      return
-    }
-    setSyncStatus({ msg: 'Salvato ✓', cls: styles.ok })
-  }
-
   function handleChange(key, val) {
-    // Aggiorna UI immediatamente
     setData(prev => {
       const next = { ...prev }
       if (val) next[key] = val
       else delete next[key]
       return next
     })
-    // Accumula in coda — sovrascrive eventuali valori precedenti per la stessa cella
     pendingRef.current[key] = val
     setSyncStatus({ msg: 'Modifiche in attesa...', cls: '' })
-    // Debounce: aspetta 1.5s di inattività poi salva tutto insieme
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(flushPending, 1500)
   }
@@ -158,25 +145,15 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
   async function applyFerie(records) {
     setSyncStatus({ msg: 'Salvataggio ferie...', cls: '' })
-    // Aggiorna stato locale immediatamente
     setData(prev => {
       const next = { ...prev }
       records.forEach(({ key, val }) => { next[key] = val })
       return next
     })
-    // Salva su Supabase in batch
     const rows = records.map(({ key, val }) => ({ chiave: key, valore: val }))
     const { error } = await supabase.from('turni').upsert(rows, { onConflict: 'chiave' })
     if (error) { setSyncStatus({ msg: 'Errore salvataggio ✗', cls: styles.err }); return }
     setSyncStatus({ msg: 'Ferie salvate ✓', cls: styles.ok })
-  }
-
-  const days = getWeekDays(currentMonday)
-
-  function colClass(d) {
-    if (isSunday(d)) return styles.sundayCol
-    if (isWeekend(d)) return styles.weekendCol
-    return ''
   }
 
   function adminOptions(service, val) {
@@ -196,8 +173,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     const disp = shiftToDisplay(val, service)
     if (!disp) return <span className={styles.emptyCell}>·</span>
     if (disp.type === 'ferie') return <span className={styles.ferieBadge}>FERIE</span>
-    const isPranzo = service === 'pranzo'
-    const showNum = !isPranzo && showShiftNum(d)
+    const showNum = service !== 'pranzo' && showShiftNum(d)
     return (
       <div className={styles.cellDisplay}>
         <span className={styles.timeStr}>{disp.time}</span>
@@ -206,12 +182,19 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     )
   }
 
+  // Calcola colore cella: colore dipendente, leggermente scurito per weekend/domenica
+  function cellBg(ei, d) {
+    const base = EMP_COLORS[ei].bg
+    if (isSunday(d)) return darken(base, 18)
+    if (isWeekend(d)) return darken(base, 10)
+    return base
+  }
+
   const currentNote = notes[weekKey] || ''
   const isStaffView = mode === 'staff'
 
   return (
     <div className={styles.app}>
-      {/* TOP BAR */}
       <div className={styles.topBar}>
         <span className={styles.titleText}>🍕 Turni Pizzeria Arcobaleno</span>
 
@@ -239,7 +222,6 @@ export default function TurniGrid({ isAdmin, onLogout }) {
         <button className={styles.logoutBtn} onClick={onLogout}>Esci</button>
       </div>
 
-      {/* NOTA STAFF */}
       {!isAdmin && tab === 'turni' && (
         <div className={styles.staffNote}>
           Visualizzazione in modalità <strong>sola lettura</strong>.
@@ -247,12 +229,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
         </div>
       )}
 
-      {/* TAB STATISTICHE */}
-      {tab === 'statistiche' && isAdmin && (
-        <Statistiche data={data} />
-      )}
+      {tab === 'statistiche' && isAdmin && <Statistiche data={data} />}
 
-      {/* TAB TURNI */}
       {tab === 'turni' && (
         <>
           <div className={styles.tableWrap}>
@@ -261,14 +239,14 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                 <tr>
                   <th className={`${styles.colName} ${styles.hdr}`} rowSpan={2}>Dipendente</th>
                   {days.map((d,i) => (
-                    <th key={i} className={`${styles.dayHeader} ${colClass(d)}`}>
+                    <th key={i} className={`${styles.dayHeader}`} style={{ background: '#f0f0f0' }}>
                       <span className={styles.dateVertical}>{formatDateVertical(d)}</span>
                       <span className={`${styles.dow} ${isWeekend(d)?styles.weekend:''}`}>{DOW_LABELS[d.getDay()]}</span>
                     </th>
                   ))}
                 </tr>
                 <tr>
-                  {days.map((d,i) => <th key={i} className={`${styles.pcHeader} ${colClass(d)}`}></th>)}
+                  {days.map((d,i) => <th key={i} className={styles.pcHeader} style={{ background: '#f5f5f5' }}></th>)}
                 </tr>
               </thead>
               <tbody>
@@ -285,10 +263,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                       {days.map((d, di) => {
                         const key = `${emp}::${toDateStr(d)}::${service}`
                         const val = data[key] || ''
-                        const cc = colClass(d)
-                        const cellBg = cc ? undefined : EMP_COLORS[ei].bg + '88'
                         return (
-                          <td key={di} className={`${styles.cellPair} ${cc}`} style={{ backgroundColor: cellBg }}>
+                          <td key={di} className={styles.cellPair} style={{ backgroundColor: cellBg(ei, d) }}>
                             {mode === 'admin' ? (
                               <select className={selectClass(val)} value={val} onChange={e => handleChange(key, e.target.value)}>
                                 {adminOptions(service, val)}
@@ -306,7 +282,6 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             </table>
           </div>
 
-          {/* NOTE SETTIMANALI */}
           {isAdmin && mode === 'admin' && (
             <div className={styles.noteBox}>
               <label className={styles.noteLabel}>📝 Note settimana {formatDateFull(days[0])} – {formatDateFull(days[6])}</label>
@@ -320,7 +295,6 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             </div>
           )}
 
-          {/* NOTA STAFF: mostra le note in sola lettura */}
           {isStaffView && currentNote && (
             <div className={styles.noteDisplay}>
               <span className={styles.noteDisplayLabel}>📝 Note della settimana</span>
@@ -328,7 +302,6 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             </div>
           )}
 
-          {/* LEGENDA solo admin */}
           {!isStaffView && (
             <div className={styles.legend}>
               <strong>Pranzo:</strong> Q = 11:30 &nbsp; W = 12:00 &nbsp; F = FERIE &nbsp;&nbsp;
@@ -336,22 +309,17 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             </div>
           )}
 
-          {/* EXPORT + FERIE */}
           <div className={styles.exportBar}>
             {isAdmin && mode === 'admin' && (
               <button className={styles.ferieBtn} onClick={() => setShowFerie(true)}>🏖 Imposta FERIE</button>
             )}
-            <button className={styles.exportBtn} onClick={() => setShowExport(true)}>⬇ Scarica turni (.xls)</button>
+            <button className={styles.exportBtn} onClick={() => setShowExport(true)}>⬇ Scarica turni</button>
           </div>
         </>
       )}
 
-      {showExport && (
-        <ExportModal data={data} currentMonday={currentMonday} onClose={() => setShowExport(false)} />
-      )}
-      {showFerie && (
-        <FerieModal currentMonday={currentMonday} onClose={() => setShowFerie(false)} onApply={applyFerie} />
-      )}
+      {showExport && <ExportModal data={data} currentMonday={currentMonday} onClose={() => setShowExport(false)} />}
+      {showFerie && <FerieModal currentMonday={currentMonday} onClose={() => setShowFerie(false)} onApply={applyFerie} />}
     </div>
   )
 }
