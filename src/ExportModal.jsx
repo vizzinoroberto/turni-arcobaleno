@@ -9,22 +9,25 @@ function fmtDate(d) {
 
 const DOW_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab']
 
-// Colori per dipendente: sfondo leggero + testo scuro abbinato
 const EMP_COLORS = [
-  { bg: '#DBEAFE', fg: '#1E3A5F' }, // azzurro
-  { bg: '#D1FAE5', fg: '#064E3B' }, // verde
-  { bg: '#FDE68A', fg: '#78350F' }, // giallo
-  { bg: '#FCE7F3', fg: '#831843' }, // rosa
-  { bg: '#E0E7FF', fg: '#312E81' }, // indaco
-  { bg: '#FFEDD5', fg: '#7C2D12' }, // arancio
-  { bg: '#F3E8FF', fg: '#581C87' }, // viola
+  { bg: '#DBEAFE', fg: '#1E3A5F' },
+  { bg: '#D1FAE5', fg: '#064E3B' },
+  { bg: '#FEF9C3', fg: '#78350F' },
+  { bg: '#FCE7F3', fg: '#831843' },
+  { bg: '#E0E7FF', fg: '#312E81' },
+  { bg: '#FFEDD5', fg: '#7C2D12' },
+  { bg: '#F3E8FF', fg: '#581C87' },
 ]
+
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]
+}
 
 function shiftLabel(val, service) {
   if (!val) return ''
   if (val === 'F') return 'FERIE'
   const map = service === 'pranzo' ? PRANZO_MAP : CENA_MAP
-  return map[val] ? map[val] : ''
+  return map[val] || ''
 }
 
 function getDates(from, to) {
@@ -35,29 +38,22 @@ function getDates(from, to) {
   return dates
 }
 
-// ── XLS (formato XLSX reale via SheetJS) ──────────────────────────────────────
+// ── XLS ──────────────────────────────────────────────────────────────────────
 function buildAndDownloadXLS(data, from, to, employees) {
-  const dates = getDates(from, to)
-
-  // Layout: righe dipendenti × date, impaginazione verticale (dipendenti in righe, date in colonne)
-  // Struttura: nome | P/C | data1 | data2 | ...
   const XLSX = window.XLSX
-  if (!XLSX) { alert('Libreria XLSX non caricata, riprova tra qualche secondo.'); return }
-
+  if (!XLSX) { alert('Libreria XLSX non caricata, riprova.'); return }
+  const dates = getDates(from, to)
   const wb = XLSX.utils.book_new()
   const wsData = []
 
-  // Riga 1 - date
   const hdrDate = ['Dipendente', '']
   dates.forEach(d => { hdrDate.push(fmtDate(d)); hdrDate.push('') })
   wsData.push(hdrDate)
 
-  // Riga 2 - giorno settimana
   const hdrDow = ['', '']
   dates.forEach(d => { hdrDow.push(DOW_IT[d.getDay()]); hdrDow.push('') })
   wsData.push(hdrDow)
 
-  // Riga 3 - P/C
   const hdrPC = ['', '']
   dates.forEach(() => { hdrPC.push('Pranzo'); hdrPC.push('Cena') })
   wsData.push(hdrPC)
@@ -73,12 +69,9 @@ function buildAndDownloadXLS(data, from, to, employees) {
   })
 
   const ws = XLSX.utils.aoa_to_sheet(wsData)
-
-  // Larghezze colonne
   const colWidths = [{ wch: 22 }, { wch: 4 }]
   dates.forEach(() => { colWidths.push({ wch: 9 }); colWidths.push({ wch: 9 }) })
   ws['!cols'] = colWidths
-
   XLSX.utils.book_append_sheet(wb, ws, 'Turni')
 
   const df = from.replace(/-/g,'')
@@ -86,87 +79,114 @@ function buildAndDownloadXLS(data, from, to, employees) {
   XLSX.writeFile(wb, `turni_${df}${from !== to ? '_'+dt : ''}.xlsx`)
 }
 
-// ── PDF (jsPDF + autoTable) ───────────────────────────────────────────────────
+// ── PDF — max 14 giorni per pagina (2 settimane) ──────────────────────────────
 function buildAndDownloadPDF(data, from, to, employees) {
   const { jsPDF } = window.jspdf
   if (!jsPDF) { alert('Libreria PDF non caricata, riprova.'); return }
 
-  const dates = getDates(from, to)
+  const allDates = getDates(from, to)
+  const CHUNK = 14 // giorni per pagina
+  const chunks = []
+  for (let i = 0; i < allDates.length; i += CHUNK) {
+    chunks.push(allDates.slice(i, i + CHUNK))
+  }
+
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+  const pageW = 277
+  const margin = 12
+  const nameColW = 36
 
-  // Titolo
-  doc.setFontSize(13)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Turni Pizzeria Arcobaleno', 14, 14)
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
-  doc.text(`Periodo: ${fmtDate(new Date(from))} – ${fmtDate(new Date(to))}`, 14, 20)
+  chunks.forEach((dates, ci) => {
+    if (ci > 0) doc.addPage()
 
-  // Intestazioni colonne: Data + giorno su due righe
-  const head = [['Dipendente', ...dates.flatMap(d => [`${fmtDate(d)}\n${DOW_IT[d.getDay()]}`, ''])]]
+    // Titolo pagina
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Turni Pizzeria Arcobaleno', margin, 10)
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    const periodLabel = `${fmtDate(dates[0])} – ${fmtDate(dates[dates.length-1])}`
+    doc.text(`Periodo: ${periodLabel}`, margin, 16)
+    if (chunks.length > 1) {
+      doc.text(`(pagina ${ci+1} di ${chunks.length})`, pageW - margin, 16, { align: 'right' })
+    }
 
-  // Sub-header P/C
-  const subHead = [['', ...dates.flatMap(() => ['Pranzo', 'Cena'])]]
+    // Calcola larghezza celle: distribuzione uniforme tra le date
+    const available = pageW - margin * 2 - nameColW
+    const dayW = available / dates.length
+    const subW = dayW / 2
 
-  // Dati
-  const body = employees.map((emp, ei) => {
-    const { bg, fg } = EMP_COLORS[ei % EMP_COLORS.length]
-    const row = [emp, ...dates.flatMap(d => {
-      const ds = toDateStr(d)
-      return [
-        shiftLabel(data[`${emp}::${ds}::pranzo`], 'pranzo') || '—',
-        shiftLabel(data[`${emp}::${ds}::cena`], 'cena') || '—',
-      ]
-    })]
-    return row
-  })
+    // Intestazioni: riga 1 = date+giorno, riga 2 = Pranzo/Cena
+    const headRow1 = ['Dipendente', ...dates.flatMap(d => [`${fmtDate(d)} ${DOW_IT[d.getDay()]}`, ''])]
+    const headRow2 = ['', ...dates.flatMap(() => ['P', 'C'])]
 
-  // Calcola larghezze colonne in base alle date
-  const pageWidth = 277 // A4 landscape
-  const nameCol = 32
-  const remaining = pageWidth - 14 - 14 - nameCol
-  const dayW = remaining / dates.length
-  const colW = [nameCol, ...dates.flatMap(() => [dayW/2, dayW/2])]
+    // Corpo: una riga per dipendente
+    const body = employees.map((emp, ei) => {
+      const row = [emp]
+      dates.forEach(d => {
+        const ds = toDateStr(d)
+        row.push(shiftLabel(data[`${emp}::${ds}::pranzo`], 'pranzo') || '—')
+        row.push(shiftLabel(data[`${emp}::${ds}::cena`], 'cena') || '—')
+      })
+      return row
+    })
 
-  doc.autoTable({
-    startY: 24,
-    head: [...head, ...subHead],
-    body,
-    columnStyles: Object.fromEntries(colW.map((w, i) => [i, { cellWidth: w }])),
-    styles: { fontSize: 7, cellPadding: 1.5, halign: 'center', valign: 'middle' },
-    headStyles: { fillColor: [50, 50, 50], textColor: 255, fontStyle: 'bold', fontSize: 7 },
-    bodyStyles: { textColor: [40, 40, 40] },
-    didParseCell(hookData) {
-      if (hookData.section === 'body') {
-        const empIdx = hookData.row.index
-        const { bg, fg } = EMP_COLORS[empIdx % EMP_COLORS.length]
-        const bgRgb = hexToRgb(bg)
-        const fgRgb = hexToRgb(fg)
-        hookData.cell.styles.fillColor = bgRgb
-        hookData.cell.styles.textColor = fgRgb
-        // Nome dipendente in grassetto
-        if (hookData.column.index === 0) hookData.cell.styles.fontStyle = 'bold'
-        // FERIE evidenziato
-        if (hookData.cell.raw === 'FERIE') {
-          hookData.cell.styles.fillColor = [254, 243, 205]
-          hookData.cell.styles.textColor = [133, 100, 4]
-          hookData.cell.styles.fontStyle = 'bold'
+    // Stili colonne
+    const columnStyles = { 0: { cellWidth: nameColW, halign: 'left', fontStyle: 'bold' } }
+    dates.forEach((_, di) => {
+      columnStyles[1 + di*2]     = { cellWidth: subW, halign: 'center' }
+      columnStyles[1 + di*2 + 1] = { cellWidth: subW, halign: 'center' }
+    })
+
+    doc.autoTable({
+      startY: 19,
+      head: [headRow1, headRow2],
+      body,
+      columnStyles,
+      styles: { fontSize: 7, cellPadding: 1.5, valign: 'middle', overflow: 'hidden' },
+      headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 6.5, halign: 'center', valign: 'middle' },
+      didParseCell(hookData) {
+        if (hookData.section === 'body') {
+          const col = hookData.column.index
+          // Colore dipendente su tutte le celle
+          if (col >= 1) {
+            const ei = hookData.row.index
+            const { bg, fg } = EMP_COLORS[ei % EMP_COLORS.length]
+            hookData.cell.styles.fillColor = hexToRgb(bg)
+            hookData.cell.styles.textColor = hexToRgb(fg)
+          } else {
+            // Colonna nome
+            const ei = hookData.row.index
+            const { bg, fg } = EMP_COLORS[ei % EMP_COLORS.length]
+            hookData.cell.styles.fillColor = hexToRgb(bg)
+            hookData.cell.styles.textColor = hexToRgb(fg)
+          }
+          // Weekend: testo data in colore diverso (gestito tramite head)
+          // FERIE in giallo
+          if (hookData.cell.raw === 'FERIE') {
+            hookData.cell.styles.fillColor = [254, 243, 205]
+            hookData.cell.styles.textColor = [133, 100, 4]
+            hookData.cell.styles.fontStyle = 'bold'
+            hookData.cell.styles.fontSize = 6
+          }
         }
-      }
-    },
-    margin: { left: 14, right: 14 },
+        // Intestazione 1a riga: colora sabato e domenica
+        if (hookData.section === 'head' && hookData.row.index === 0 && hookData.column.index >= 1) {
+          const dateIdx = Math.floor((hookData.column.index - 1) / 2)
+          if (dateIdx < dates.length) {
+            const dow = dates[dateIdx].getDay()
+            if (dow === 0) hookData.cell.styles.fillColor = [160, 30, 30]
+            else if (dow === 6) hookData.cell.styles.fillColor = [80, 80, 150]
+          }
+        }
+      },
+      margin: { left: margin, right: margin },
+    })
   })
 
   const df = fmtDate(new Date(from)).replace(/\//g,'')
   const dt = fmtDate(new Date(to)).replace(/\//g,'')
   doc.save(`turni_${df}${from !== to ? '_'+dt : ''}.pdf`)
-}
-
-function hexToRgb(hex) {
-  const r = parseInt(hex.slice(1,3),16)
-  const g = parseInt(hex.slice(3,5),16)
-  const b = parseInt(hex.slice(5,7),16)
-  return [r, g, b]
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
