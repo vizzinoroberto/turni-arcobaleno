@@ -80,17 +80,36 @@
   width: 100%;
 }
 
-.exportBtn {
+.btnRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.xlsBtn {
+  flex: 1;
   padding: 10px;
   background: #27ae60;
   color: #fff;
   border: none;
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: bold;
   cursor: pointer;
   transition: background 0.15s;
-  margin-top: 4px;
 }
+.xlsBtn:hover { background: #1e8449; }
 
-.exportBtn:hover { background: #1e8449; }
+.pdfBtn {
+  flex: 1;
+  padding: 10px;
+  background: #c0392b;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pdfBtn:hover { background: #a93226; }

@@ -11,6 +11,17 @@ import styles from './TurniGrid.module.css'
 
 const FESTIVI = new Set(['04-25','05-01','06-02','08-15','11-01','12-08','12-24','12-25','12-26','12-31'])
 
+// Colore di sfondo leggero per ogni dipendente (stesso ordine di EMPLOYEES)
+const EMP_COLORS = [
+  { bg: '#DBEAFE', border: '#93C5FD' }, // azzurro   - Francesca
+  { bg: '#D1FAE5', border: '#6EE7B7' }, // verde     - Benedetta
+  { bg: '#FEF9C3', border: '#FDE047' }, // giallo    - Giulia
+  { bg: '#FCE7F3', border: '#F9A8D4' }, // rosa      - Aurora
+  { bg: '#E0E7FF', border: '#A5B4FC' }, // indaco    - Sara
+  { bg: '#FFEDD5', border: '#FDB888' }, // arancio   - Ilaria
+  { bg: '#F3E8FF', border: '#C4B5FD' }, // viola     - Nicole
+]
+
 function isFestivo(d) {
   const mm = String(d.getMonth()+1).padStart(2,'0')
   const dd = String(d.getDate()).padStart(2,'0')
@@ -261,15 +272,23 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                 </tr>
               </thead>
               <tbody>
-                {EMPLOYEES.map(emp =>
+                {EMPLOYEES.map((emp, ei) =>
                   ['pranzo','cena'].map((service, si) => (
                     <tr key={`${emp}-${service}`} className={si===0?styles.rowPranzo:styles.rowCena}>
-                      {si===0 && <td className={styles.colName} rowSpan={2}>{emp}</td>}
+                      {si===0 && (
+                        <td
+                          className={styles.colName}
+                          rowSpan={2}
+                          style={{ backgroundColor: EMP_COLORS[ei].bg, borderLeft: `4px solid ${EMP_COLORS[ei].border}` }}
+                        >{emp}</td>
+                      )}
                       {days.map((d, di) => {
                         const key = `${emp}::${toDateStr(d)}::${service}`
                         const val = data[key] || ''
+                        const cc = colClass(d)
+                        const cellBg = cc ? undefined : EMP_COLORS[ei].bg + '88'
                         return (
-                          <td key={di} className={`${styles.cellPair} ${colClass(d)}`}>
+                          <td key={di} className={`${styles.cellPair} ${cc}`} style={{ backgroundColor: cellBg }}>
                             {mode === 'admin' ? (
                               <select className={selectClass(val)} value={val} onChange={e => handleChange(key, e.target.value)}>
                                 {adminOptions(service, val)}
