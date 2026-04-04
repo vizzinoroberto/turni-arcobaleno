@@ -73,124 +73,120 @@ function buildAndDownloadXLS(data, from, to, employees) {
   dates.forEach(() => { colWidths.push({ wch: 9 }); colWidths.push({ wch: 9 }) })
   ws['!cols'] = colWidths
   XLSX.utils.book_append_sheet(wb, ws, 'Turni')
-
   const df = from.replace(/-/g,'')
   const dt = to.replace(/-/g,'')
   XLSX.writeFile(wb, `turni_${df}${from !== to ? '_'+dt : ''}.xlsx`)
 }
 
-// ── PDF — settimane intere, max 2 per pagina (spezza alla domenica) ───────────
+// ── PDF — 2 settimane per pagina impilate verticalmente ───────────────────────
+function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nameColW, totalPages, pageNum) {
+  const available = pageW - margin * 2 - nameColW
+  const dayW = available / dates.length
+  const subW = dayW / 2
+
+  const headRow1 = ['Dipendente', ...dates.flatMap(d => [`${fmtDate(d)} ${DOW_IT[d.getDay()]}`, ''])]
+  const headRow2 = ['', ...dates.flatMap(() => ['P', 'C'])]
+
+  const body = employees.map((emp, ei) => {
+    const row = [emp]
+    dates.forEach(d => {
+      const ds = toDateStr(d)
+      row.push(shiftLabel(data[`${emp}::${ds}::pranzo`], 'pranzo') || '—')
+      row.push(shiftLabel(data[`${emp}::${ds}::cena`], 'cena') || '—')
+    })
+    return row
+  })
+
+  const columnStyles = { 0: { cellWidth: nameColW, halign: 'left', fontStyle: 'bold' } }
+  dates.forEach((_, di) => {
+    columnStyles[1 + di*2]     = { cellWidth: subW, halign: 'center' }
+    columnStyles[1 + di*2 + 1] = { cellWidth: subW, halign: 'center' }
+  })
+
+  doc.autoTable({
+    startY,
+    head: [headRow1, headRow2],
+    body,
+    columnStyles,
+    styles: { fontSize: 7.5, cellPadding: 1.8, valign: 'middle', overflow: 'hidden' },
+    headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle' },
+    didParseCell(hookData) {
+      if (hookData.section === 'body') {
+        const ei = hookData.row.index
+        const { bg, fg } = EMP_COLORS[ei % EMP_COLORS.length]
+        hookData.cell.styles.fillColor = hexToRgb(bg)
+        hookData.cell.styles.textColor = hexToRgb(fg)
+        if (hookData.cell.raw === 'FERIE') {
+          hookData.cell.styles.fillColor = [254, 243, 205]
+          hookData.cell.styles.textColor = [133, 100, 4]
+          hookData.cell.styles.fontStyle = 'bold'
+          hookData.cell.styles.fontSize = 6.5
+        }
+      }
+      if (hookData.section === 'head' && hookData.row.index === 0 && hookData.column.index >= 1) {
+        const dateIdx = Math.floor((hookData.column.index - 1) / 2)
+        if (dateIdx < dates.length) {
+          const dow = dates[dateIdx].getDay()
+          if (dow === 0) hookData.cell.styles.fillColor = [160, 30, 30]
+          else if (dow === 6) hookData.cell.styles.fillColor = [60, 60, 140]
+        }
+      }
+    },
+    margin: { left: margin, right: margin },
+  })
+
+  return doc.lastAutoTable.finalY
+}
+
 function buildAndDownloadPDF(data, from, to, employees) {
   const { jsPDF } = window.jspdf
   if (!jsPDF) { alert('Libreria PDF non caricata, riprova.'); return }
 
   const allDates = getDates(from, to)
 
-  // Raggruppa in settimane (spezza ogni domenica)
+  // Raggruppa in settimane spezzando alla domenica
   const weeks = []
-  let currentWeek = []
+  let cur = []
   allDates.forEach(d => {
-    currentWeek.push(d)
-    if (d.getDay() === 0) { // domenica = fine settimana
-      weeks.push(currentWeek)
-      currentWeek = []
-    }
+    cur.push(d)
+    if (d.getDay() === 0) { weeks.push(cur); cur = [] }
   })
-  if (currentWeek.length > 0) weeks.push(currentWeek) // settimana incompleta finale
+  if (cur.length > 0) weeks.push(cur)
 
-  // 1 settimana per pagina = sempre max 7 colonne, orari sempre leggibili
-  const chunks = weeks
+  // Raggruppa in coppie: 2 settimane per pagina
+  const pages = []
+  for (let i = 0; i < weeks.length; i += 2) {
+    pages.push(weeks.slice(i, i + 2))
+  }
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const pageW = 277
   const margin = 12
   const nameColW = 36
 
-  chunks.forEach((dates, ci) => {
-    if (ci > 0) doc.addPage()
+  pages.forEach((pageWeeks, pi) => {
+    if (pi > 0) doc.addPage()
 
-    // Titolo pagina
+    // Intestazione pagina
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
     doc.text('Turni Pizzeria Arcobaleno', margin, 10)
     doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
-    const periodLabel = `${fmtDate(dates[0])} – ${fmtDate(dates[dates.length-1])}`
-    doc.text(`Periodo: ${periodLabel}`, margin, 16)
-    if (chunks.length > 1) {
-      doc.text(`(pagina ${ci+1} di ${chunks.length})`, pageW - margin, 16, { align: 'right' })
+    if (pages.length > 1) {
+      doc.text(`(pagina ${pi+1} di ${pages.length})`, pageW - margin, 10, { align: 'right' })
     }
 
-    // Calcola larghezza celle: distribuzione uniforme tra le date
-    const available = pageW - margin * 2 - nameColW
-    const dayW = available / dates.length
-    const subW = dayW / 2
-
-    // Intestazioni: riga 1 = date+giorno, riga 2 = Pranzo/Cena
-    const headRow1 = ['Dipendente', ...dates.flatMap(d => [`${fmtDate(d)} ${DOW_IT[d.getDay()]}`, ''])]
-    const headRow2 = ['', ...dates.flatMap(() => ['P', 'C'])]
-
-    // Corpo: una riga per dipendente
-    const body = employees.map((emp, ei) => {
-      const row = [emp]
-      dates.forEach(d => {
-        const ds = toDateStr(d)
-        row.push(shiftLabel(data[`${emp}::${ds}::pranzo`], 'pranzo') || '—')
-        row.push(shiftLabel(data[`${emp}::${ds}::cena`], 'cena') || '—')
-      })
-      return row
-    })
-
-    // Stili colonne
-    const columnStyles = { 0: { cellWidth: nameColW, halign: 'left', fontStyle: 'bold' } }
-    dates.forEach((_, di) => {
-      columnStyles[1 + di*2]     = { cellWidth: subW, halign: 'center' }
-      columnStyles[1 + di*2 + 1] = { cellWidth: subW, halign: 'center' }
-    })
-
-    doc.autoTable({
-      startY: 19,
-      head: [headRow1, headRow2],
-      body,
-      columnStyles,
-      styles: { fontSize: 7, cellPadding: 1.5, valign: 'middle', overflow: 'hidden' },
-      headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 6.5, halign: 'center', valign: 'middle' },
-      didParseCell(hookData) {
-        if (hookData.section === 'body') {
-          const col = hookData.column.index
-          // Colore dipendente su tutte le celle
-          if (col >= 1) {
-            const ei = hookData.row.index
-            const { bg, fg } = EMP_COLORS[ei % EMP_COLORS.length]
-            hookData.cell.styles.fillColor = hexToRgb(bg)
-            hookData.cell.styles.textColor = hexToRgb(fg)
-          } else {
-            // Colonna nome
-            const ei = hookData.row.index
-            const { bg, fg } = EMP_COLORS[ei % EMP_COLORS.length]
-            hookData.cell.styles.fillColor = hexToRgb(bg)
-            hookData.cell.styles.textColor = hexToRgb(fg)
-          }
-          // Weekend: testo data in colore diverso (gestito tramite head)
-          // FERIE in giallo
-          if (hookData.cell.raw === 'FERIE') {
-            hookData.cell.styles.fillColor = [254, 243, 205]
-            hookData.cell.styles.textColor = [133, 100, 4]
-            hookData.cell.styles.fontStyle = 'bold'
-            hookData.cell.styles.fontSize = 6
-          }
-        }
-        // Intestazione 1a riga: colora sabato e domenica
-        if (hookData.section === 'head' && hookData.row.index === 0 && hookData.column.index >= 1) {
-          const dateIdx = Math.floor((hookData.column.index - 1) / 2)
-          if (dateIdx < dates.length) {
-            const dow = dates[dateIdx].getDay()
-            if (dow === 0) hookData.cell.styles.fillColor = [160, 30, 30]
-            else if (dow === 6) hookData.cell.styles.fillColor = [80, 80, 150]
-          }
-        }
-      },
-      margin: { left: margin, right: margin },
+    let currentY = 13
+    pageWeeks.forEach((weekDates, wi) => {
+      // Etichetta mini sopra ogni tabella
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(80, 80, 80)
+      doc.text(`Settimana: ${fmtDate(weekDates[0])} – ${fmtDate(weekDates[weekDates.length-1])}`, margin, currentY + 3)
+      doc.setTextColor(0, 0, 0)
+      currentY = renderWeekTable(doc, weekDates, employees, data, currentY + 5, pageW, margin, nameColW, pages.length, pi + 1)
+      currentY += 6 // spazio tra le due tabelle
     })
   })
 
