@@ -79,16 +79,29 @@ function buildAndDownloadXLS(data, from, to, employees) {
   XLSX.writeFile(wb, `turni_${df}${from !== to ? '_'+dt : ''}.xlsx`)
 }
 
-// ── PDF — max 14 giorni per pagina (2 settimane) ──────────────────────────────
+// ── PDF — settimane intere, max 2 per pagina (spezza alla domenica) ───────────
 function buildAndDownloadPDF(data, from, to, employees) {
   const { jsPDF } = window.jspdf
   if (!jsPDF) { alert('Libreria PDF non caricata, riprova.'); return }
 
   const allDates = getDates(from, to)
-  const CHUNK = 14 // giorni per pagina
+
+  // Raggruppa in settimane (spezza ogni domenica)
+  const weeks = []
+  let currentWeek = []
+  allDates.forEach(d => {
+    currentWeek.push(d)
+    if (d.getDay() === 0) { // domenica = fine settimana
+      weeks.push(currentWeek)
+      currentWeek = []
+    }
+  })
+  if (currentWeek.length > 0) weeks.push(currentWeek) // settimana incompleta finale
+
+  // Raggruppa settimane in chunk da max 2
   const chunks = []
-  for (let i = 0; i < allDates.length; i += CHUNK) {
-    chunks.push(allDates.slice(i, i + CHUNK))
+  for (let i = 0; i < weeks.length; i += 2) {
+    chunks.push(weeks.slice(i, i + 2).flat())
   }
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
