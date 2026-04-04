@@ -190,8 +190,7 @@
   width: 38px;
 }
 
-.weekendCol { background: #fafafa; }
-.sundayCol { background: #fff5f5; }
+/* weekendCol e sundayCol rimossi: il colore cella è gestito via style inline per dipendente */
 
 .rowPranzo td { border-bottom: none; }
 .rowCena td { border-top: 1px dashed #e0e0e0; }

@@ -12,13 +12,13 @@ import styles from './TurniGrid.module.css'
 const FESTIVI = new Set(['04-25','05-01','06-02','08-15','11-01','12-08','12-24','12-25','12-26','12-31'])
 
 const EMP_COLORS = [
-  { bg: '#DBEAFE', border: '#93C5FD' }, // azzurro   - Francesca
-  { bg: '#D1FAE5', border: '#6EE7B7' }, // verde     - Benedetta
-  { bg: '#FEF9C3', border: '#FDE047' }, // giallo    - Giulia
-  { bg: '#FCE7F3', border: '#F9A8D4' }, // rosa      - Aurora
-  { bg: '#E0E7FF', border: '#A5B4FC' }, // indaco    - Sara
-  { bg: '#FFEDD5', border: '#FDB888' }, // arancio   - Ilaria
-  { bg: '#F3E8FF', border: '#C4B5FD' }, // viola     - Nicole
+  { bg: '#DBEAFE', border: '#93C5FD' },
+  { bg: '#D1FAE5', border: '#6EE7B7' },
+  { bg: '#FEF9C3', border: '#FDE047' },
+  { bg: '#FCE7F3', border: '#F9A8D4' },
+  { bg: '#E0E7FF', border: '#A5B4FC' },
+  { bg: '#FFEDD5', border: '#FDB888' },
+  { bg: '#F3E8FF', border: '#C4B5FD' },
 ]
 
 function isFestivo(d) {
@@ -36,12 +36,19 @@ function formatDateFull(d) {
   return `${dd}/${mm}/${yy}`
 }
 
-// Scurisce leggermente il colore hex per weekend/domenica
+// Scurisce un colore hex RGB di `amount` per sabato/domenica
 function darken(hex, amount) {
   const r = Math.max(0, parseInt(hex.slice(1,3),16) - amount)
   const g = Math.max(0, parseInt(hex.slice(3,5),16) - amount)
   const b = Math.max(0, parseInt(hex.slice(5,7),16) - amount)
   return `rgb(${r},${g},${b})`
+}
+
+function cellBg(ei, d) {
+  const base = EMP_COLORS[ei].bg
+  if (isSunday(d)) return darken(base, 20)
+  if (isWeekend(d)) return darken(base, 10)
+  return base
 }
 
 export default function TurniGrid({ isAdmin, onLogout }) {
@@ -182,14 +189,6 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     )
   }
 
-  // Calcola colore cella: colore dipendente, leggermente scurito per weekend/domenica
-  function cellBg(ei, d) {
-    const base = EMP_COLORS[ei].bg
-    if (isSunday(d)) return darken(base, 18)
-    if (isWeekend(d)) return darken(base, 10)
-    return base
-  }
-
   const currentNote = notes[weekKey] || ''
   const isStaffView = mode === 'staff'
 
@@ -197,27 +196,23 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     <div className={styles.app}>
       <div className={styles.topBar}>
         <span className={styles.titleText}>🍕 Turni Pizzeria Arcobaleno</span>
-
         {isAdmin && (
           <div className={styles.mainTabs}>
             <button className={`${styles.mainTab} ${tab==='turni'?styles.mainTabActive:''}`} onClick={() => setTab('turni')}>Turni</button>
             <button className={`${styles.mainTab} ${tab==='statistiche'?styles.mainTabActive:''}`} onClick={() => setTab('statistiche')}>Statistiche</button>
           </div>
         )}
-
         {tab === 'turni' && <>
           <button className={styles.navBtn} onClick={() => changeWeek(m => addDays(m,-7))}>←</button>
           <span className={styles.weekLabel}>{formatDateFull(days[0])} – {formatDateFull(days[6])}</span>
           <button className={styles.navBtn} onClick={() => changeWeek(m => addDays(m,7))}>→</button>
         </>}
-
         {isAdmin && tab === 'turni' && (
           <div className={styles.modeToggle}>
             <button className={`${styles.modeBtn} ${mode==='admin'?styles.active:''}`} onClick={() => setMode('admin')}>Admin</button>
             <button className={`${styles.modeBtn} ${mode==='staff'?styles.active:''}`} onClick={() => setMode('staff')}>Dipendenti</button>
           </div>
         )}
-
         <span className={`${styles.syncStatus} ${syncStatus.cls}`}>{syncStatus.msg}</span>
         <button className={styles.logoutBtn} onClick={onLogout}>Esci</button>
       </div>
@@ -239,14 +234,14 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                 <tr>
                   <th className={`${styles.colName} ${styles.hdr}`} rowSpan={2}>Dipendente</th>
                   {days.map((d,i) => (
-                    <th key={i} className={`${styles.dayHeader}`} style={{ background: '#f0f0f0' }}>
+                    <th key={i} className={styles.dayHeader}>
                       <span className={styles.dateVertical}>{formatDateVertical(d)}</span>
                       <span className={`${styles.dow} ${isWeekend(d)?styles.weekend:''}`}>{DOW_LABELS[d.getDay()]}</span>
                     </th>
                   ))}
                 </tr>
                 <tr>
-                  {days.map((d,i) => <th key={i} className={styles.pcHeader} style={{ background: '#f5f5f5' }}></th>)}
+                  {days.map((d,i) => <th key={i} className={styles.pcHeader}></th>)}
                 </tr>
               </thead>
               <tbody>
@@ -264,7 +259,11 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                         const key = `${emp}::${toDateStr(d)}::${service}`
                         const val = data[key] || ''
                         return (
-                          <td key={di} className={styles.cellPair} style={{ backgroundColor: cellBg(ei, d) }}>
+                          <td
+                            key={di}
+                            className={styles.cellPair}
+                            style={{ backgroundColor: cellBg(ei, d) }}
+                          >
                             {mode === 'admin' ? (
                               <select className={selectClass(val)} value={val} onChange={e => handleChange(key, e.target.value)}>
                                 {adminOptions(service, val)}
