@@ -32,9 +32,12 @@ function shiftLabel(val, service) {
 
 function getDates(from, to) {
   const dates = []
-  const cur = new Date(from)
-  const end = new Date(to)
-  while (cur <= end) { dates.push(new Date(cur)); cur.setDate(cur.getDate()+1) }
+  const cur = new Date(from + 'T12:00:00') // ora fissa per evitare problemi DST
+  const end = new Date(to + 'T12:00:00')
+  while (cur <= end) {
+    dates.push(new Date(cur))
+    cur.setDate(cur.getDate() + 1)
+  }
   return dates
 }
 
@@ -87,7 +90,7 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
   const headRow1 = ['Dipendente', ...dates.flatMap(d => [`${fmtDate(d)} ${DOW_IT[d.getDay()]}`, ''])]
   const headRow2 = ['', ...dates.flatMap(() => ['P', 'C'])]
 
-  const body = employees.map((emp, ei) => {
+  const body = employees.map((emp) => {
     const row = [emp]
     dates.forEach(d => {
       const ds = toDateStr(d)
@@ -144,7 +147,6 @@ function buildAndDownloadPDF(data, from, to, employees) {
 
   const allDates = getDates(from, to)
 
-  // Raggruppa in settimane spezzando alla domenica
   const weeks = []
   let cur = []
   allDates.forEach(d => {
@@ -153,7 +155,6 @@ function buildAndDownloadPDF(data, from, to, employees) {
   })
   if (cur.length > 0) weeks.push(cur)
 
-  // 2 settimane per pagina impilate verticalmente
   const pages = []
   for (let i = 0; i < weeks.length; i += 2) {
     pages.push(weeks.slice(i, i + 2))
@@ -192,22 +193,20 @@ function buildAndDownloadPDF(data, from, to, employees) {
   doc.save(`turni_${df}${from !== to ? '_'+dt : ''}.pdf`)
 }
 
-// ── ICS (Google Calendar / Apple Calendario) ──────────────────────────────────
+// ── ICS — con fuso orario Europe/Rome per evitare scorrimenti di data ─────────
 function icsDateTime(date, timeStr, durationHours) {
-  // date: oggetto Date, timeStr: "18:00", durationHours: 3.5
   const [h, m] = timeStr.split(':').map(Number)
-  const start = new Date(date)
-  start.setHours(h, m, 0, 0)
-  const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000)
+  const year = date.getFullYear()
+  const month = pad(date.getMonth() + 1)
+  const day = pad(date.getDate())
 
-  function fmt(d) {
-    return d.getFullYear().toString() +
-      pad(d.getMonth()+1) +
-      pad(d.getDate()) + 'T' +
-      pad(d.getHours()) +
-      pad(d.getMinutes()) + '00'
-  }
-  return { start: fmt(start), end: fmt(end) }
+  let endH = h + Math.floor(durationHours)
+  let endM = m + Math.round((durationHours % 1) * 60)
+  if (endM >= 60) { endH += 1; endM -= 60 }
+
+  const startStr = `${year}${month}${day}T${pad(h)}${pad(m)}00`
+  const endStr   = `${year}${month}${day}T${pad(endH)}${pad(endM)}00`
+  return { start: startStr, end: endStr }
 }
 
 function buildAndDownloadICS(data, from, to, employees) {
@@ -218,32 +217,48 @@ function buildAndDownloadICS(data, from, to, employees) {
     'PRODID:-//Pizzeria Arcobaleno//Turni//IT',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
+    'X-WR-TIMEZONE:Europe/Rome',
+    'BEGIN:VTIMEZONE',
+    'TZID:Europe/Rome',
+    'BEGIN:DAYLIGHT',
+    'TZOFFSETFROM:+0100',
+    'TZOFFSETTO:+0200',
+    'TZNAME:CEST',
+    'DTSTART:19700329T020000',
+    'RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3',
+    'END:DAYLIGHT',
+    'BEGIN:STANDARD',
+    'TZOFFSETFROM:+0200',
+    'TZOFFSETTO:+0100',
+    'TZNAME:CET',
+    'DTSTART:19701025T030000',
+    'RRULE:FREQ=YEARLY;BYDAY=-1SU;BYMONTH=10',
+    'END:STANDARD',
+    'END:VTIMEZONE',
   ]
 
-  const uid_base = Date.now()
   let eventCount = 0
+  const uid_base = Date.now()
 
   employees.forEach(emp => {
     dates.forEach(d => {
       const ds = toDateStr(d)
-
       ;['pranzo', 'cena'].forEach(service => {
         const val = data[`${emp}::${ds}::${service}`]
         if (!val || val === 'F') return
-
         const map = service === 'pranzo' ? PRANZO_MAP : CENA_MAP
         const timeStr = map[val]
         if (!timeStr) return
 
         const duration = service === 'pranzo' ? 2.5 : 3.5
         const { start, end } = icsDateTime(d, timeStr, duration)
-        const empShort = emp.split(' ')[0] // solo nome
+        const empShort = emp.split(' ')[0]
         const summary = `${empShort} - ${service === 'pranzo' ? 'Pranzo' : 'Cena'} ${timeStr}`
 
         lines.push('BEGIN:VEVENT')
         lines.push(`UID:${uid_base}-${eventCount++}@arcobaleno`)
-        lines.push(`DTSTART:${start}`)
-        lines.push(`DTEND:${end}`)
+        lines.push(`DTSTART;TZID=Europe/Rome:${start}`)
+        lines.push(`DTEND;TZID=Europe/Rome:${end}`)
         lines.push(`SUMMARY:${summary}`)
         lines.push(`DESCRIPTION:Turno ${service} - ${emp}`)
         lines.push('END:VEVENT')
@@ -257,9 +272,9 @@ function buildAndDownloadICS(data, from, to, employees) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   const df = from.replace(/-/g,'')
-  const dt = to.replace(/-/g,'')
+  const dt2 = to.replace(/-/g,'')
   a.href = url
-  a.download = `turni_${df}${from !== to ? '_'+dt : ''}.ics`
+  a.download = `turni_${df}${from !== to ? '_'+dt2 : ''}.ics`
   a.click()
   URL.revokeObjectURL(url)
 }
