@@ -11,7 +11,7 @@
 .modal {
   background: #fff;
   border-radius: 10px;
-  width: 380px;
+  width: 400px;
   max-width: 95vw;
   padding: 24px;
   display: flex;
@@ -36,12 +36,17 @@
   cursor: pointer;
   padding: 2px 6px;
 }
-
 .closeBtn:hover { color: #333; }
 
 .section { display: flex; flex-direction: column; gap: 8px; }
 
-.label { font-size: 12px; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.04em; }
+.label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 .radios { display: flex; flex-direction: column; gap: 6px; }
 
@@ -54,10 +59,8 @@
   cursor: pointer;
 }
 
-.dateRow { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
-
+.dateRow { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .dateField { display: flex; align-items: center; gap: 6px; }
-
 .dateLabel { font-size: 12px; color: #888; }
 
 .dateInput {
@@ -67,7 +70,6 @@
   font-size: 13px;
   outline: none;
 }
-
 .dateInput:focus { border-color: #4a90d9; }
 
 .empSel {
@@ -83,7 +85,6 @@
 .btnRow {
   display: flex;
   gap: 10px;
-  margin-top: 4px;
 }
 
 .xlsBtn {
@@ -113,3 +114,26 @@
   transition: background 0.15s;
 }
 .pdfBtn:hover { background: #a93226; }
+
+.icsBtn {
+  width: 100%;
+  padding: 10px;
+  background: #4a90d9;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-top: -4px;
+}
+.icsBtn:hover { background: #357abd; }
+
+.icsNote {
+  font-size: 11px;
+  color: #888;
+  text-align: center;
+  margin-top: -10px;
+  line-height: 1.5;
+}

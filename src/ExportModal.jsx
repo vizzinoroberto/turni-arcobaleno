@@ -78,8 +78,8 @@ function buildAndDownloadXLS(data, from, to, employees) {
   XLSX.writeFile(wb, `turni_${df}${from !== to ? '_'+dt : ''}.xlsx`)
 }
 
-// ── PDF — 2 settimane per pagina impilate verticalmente ───────────────────────
-function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nameColW, totalPages, pageNum) {
+// ── PDF ───────────────────────────────────────────────────────────────────────
+function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nameColW) {
   const available = pageW - margin * 2 - nameColW
   const dayW = available / dates.length
   const subW = dayW / 2
@@ -153,7 +153,7 @@ function buildAndDownloadPDF(data, from, to, employees) {
   })
   if (cur.length > 0) weeks.push(cur)
 
-  // Raggruppa in coppie: 2 settimane per pagina
+  // 2 settimane per pagina impilate verticalmente
   const pages = []
   for (let i = 0; i < weeks.length; i += 2) {
     pages.push(weeks.slice(i, i + 2))
@@ -166,8 +166,6 @@ function buildAndDownloadPDF(data, from, to, employees) {
 
   pages.forEach((pageWeeks, pi) => {
     if (pi > 0) doc.addPage()
-
-    // Intestazione pagina
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
     doc.text('Turni Pizzeria Arcobaleno', margin, 10)
@@ -178,21 +176,92 @@ function buildAndDownloadPDF(data, from, to, employees) {
     }
 
     let currentY = 13
-    pageWeeks.forEach((weekDates, wi) => {
-      // Etichetta mini sopra ogni tabella
+    pageWeeks.forEach((weekDates) => {
       doc.setFontSize(7.5)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(80, 80, 80)
       doc.text(`Settimana: ${fmtDate(weekDates[0])} – ${fmtDate(weekDates[weekDates.length-1])}`, margin, currentY + 3)
       doc.setTextColor(0, 0, 0)
-      currentY = renderWeekTable(doc, weekDates, employees, data, currentY + 5, pageW, margin, nameColW, pages.length, pi + 1)
-      currentY += 6 // spazio tra le due tabelle
+      currentY = renderWeekTable(doc, weekDates, employees, data, currentY + 5, pageW, margin, nameColW)
+      currentY += 6
     })
   })
 
   const df = fmtDate(new Date(from)).replace(/\//g,'')
   const dt = fmtDate(new Date(to)).replace(/\//g,'')
   doc.save(`turni_${df}${from !== to ? '_'+dt : ''}.pdf`)
+}
+
+// ── ICS (Google Calendar / Apple Calendario) ──────────────────────────────────
+function icsDateTime(date, timeStr, durationHours) {
+  // date: oggetto Date, timeStr: "18:00", durationHours: 3.5
+  const [h, m] = timeStr.split(':').map(Number)
+  const start = new Date(date)
+  start.setHours(h, m, 0, 0)
+  const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000)
+
+  function fmt(d) {
+    return d.getFullYear().toString() +
+      pad(d.getMonth()+1) +
+      pad(d.getDate()) + 'T' +
+      pad(d.getHours()) +
+      pad(d.getMinutes()) + '00'
+  }
+  return { start: fmt(start), end: fmt(end) }
+}
+
+function buildAndDownloadICS(data, from, to, employees) {
+  const dates = getDates(from, to)
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Pizzeria Arcobaleno//Turni//IT',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+  ]
+
+  const uid_base = Date.now()
+  let eventCount = 0
+
+  employees.forEach(emp => {
+    dates.forEach(d => {
+      const ds = toDateStr(d)
+
+      ;['pranzo', 'cena'].forEach(service => {
+        const val = data[`${emp}::${ds}::${service}`]
+        if (!val || val === 'F') return
+
+        const map = service === 'pranzo' ? PRANZO_MAP : CENA_MAP
+        const timeStr = map[val]
+        if (!timeStr) return
+
+        const duration = service === 'pranzo' ? 2.5 : 3.5
+        const { start, end } = icsDateTime(d, timeStr, duration)
+        const empShort = emp.split(' ')[0] // solo nome
+        const summary = `${empShort} - ${service === 'pranzo' ? 'Pranzo' : 'Cena'} ${timeStr}`
+
+        lines.push('BEGIN:VEVENT')
+        lines.push(`UID:${uid_base}-${eventCount++}@arcobaleno`)
+        lines.push(`DTSTART:${start}`)
+        lines.push(`DTEND:${end}`)
+        lines.push(`SUMMARY:${summary}`)
+        lines.push(`DESCRIPTION:Turno ${service} - ${emp}`)
+        lines.push('END:VEVENT')
+      })
+    })
+  })
+
+  lines.push('END:VCALENDAR')
+
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const df = from.replace(/-/g,'')
+  const dt = to.replace(/-/g,'')
+  a.href = url
+  a.download = `turni_${df}${from !== to ? '_'+dt : ''}.ics`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -203,7 +272,7 @@ export default function ExportModal({ data, currentMonday, onClose }) {
   const [mode, setMode] = useState('settimana')
   const [from, setFrom] = useState(monStr)
   const [to, setTo] = useState(sunStr)
-  const [empMode, setEmpMode] = useState('tutti')
+  const [empMode, setEmpMode] = useState('uno')
   const [selEmp, setSelEmp] = useState(EMPLOYEES[0])
 
   function getEmployees() { return empMode === 'tutti' ? EMPLOYEES : [selEmp] }
@@ -215,6 +284,7 @@ export default function ExportModal({ data, currentMonday, onClose }) {
 
   function doXLS() { buildAndDownloadXLS(data, from, to, getEmployees()); onClose() }
   function doPDF() { buildAndDownloadPDF(data, from, to, getEmployees()); onClose() }
+  function doICS() { buildAndDownloadICS(data, from, to, getEmployees()); onClose() }
 
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -270,9 +340,14 @@ export default function ExportModal({ data, currentMonday, onClose }) {
         </div>
 
         <div className={styles.btnRow}>
-          <button className={styles.xlsBtn} onClick={doXLS}>⬇ Scarica .xlsx</button>
-          <button className={styles.pdfBtn} onClick={doPDF}>⬇ Scarica PDF</button>
+          <button className={styles.xlsBtn} onClick={doXLS}>⬇ .xlsx</button>
+          <button className={styles.pdfBtn} onClick={doPDF}>⬇ PDF</button>
         </div>
+        <button className={styles.icsBtn} onClick={doICS}>📅 Esporta su Calendario (.ics)</button>
+        <p className={styles.icsNote}>
+          Compatibile con Apple Calendario, Google Calendar, Outlook.
+          Pranzo: 2h 30min · Cena: 3h 30min
+        </p>
       </div>
     </div>
   )
