@@ -288,8 +288,8 @@ function buildAndDownloadICS(data, from, to, employees) {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function ExportModal({ data, currentMonday, onClose }) {
-  const monStr = currentMonday.toISOString().slice(0,10)
-  const sunStr = addDays(currentMonday, 6).toISOString().slice(0,10)
+  const monStr = localDateStr(currentMonday)
+  const sunStr = localDateStr(addDays(currentMonday, 6))
 
   const [mode, setMode] = useState('settimana')
   const [from, setFrom] = useState(monStr)
