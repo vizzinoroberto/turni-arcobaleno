@@ -30,15 +30,26 @@ function shiftLabel(val, service) {
   return map[val] || ''
 }
 
+// Crea date puramente locali dal formato YYYY-MM-DD senza mai passare per UTC
+function localDate(str) {
+  const [y, m, d] = str.split('-').map(Number)
+  return new Date(y, m - 1, d, 12, 0, 0) // mezzogiorno locale, mai mezzanotte
+}
+
 function getDates(from, to) {
   const dates = []
-  const cur = new Date(from + 'T12:00:00') // ora fissa per evitare problemi DST
-  const end = new Date(to + 'T12:00:00')
+  const cur = localDate(from)
+  const end = localDate(to)
   while (cur <= end) {
     dates.push(new Date(cur))
     cur.setDate(cur.getDate() + 1)
   }
   return dates
+}
+
+// Converte data locale in stringa YYYY-MM-DD senza usare toISOString()
+function localDateStr(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
 }
 
 // ── XLS ──────────────────────────────────────────────────────────────────────
@@ -64,7 +75,7 @@ function buildAndDownloadXLS(data, from, to, employees) {
   employees.forEach(emp => {
     const row = [emp, '']
     dates.forEach(d => {
-      const ds = toDateStr(d)
+      const ds = localDateStr(d)
       row.push(shiftLabel(data[`${emp}::${ds}::pranzo`], 'pranzo'))
       row.push(shiftLabel(data[`${emp}::${ds}::cena`], 'cena'))
     })
@@ -93,7 +104,7 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
   const body = employees.map((emp) => {
     const row = [emp]
     dates.forEach(d => {
-      const ds = toDateStr(d)
+      const ds = localDateStr(d)
       row.push(shiftLabel(data[`${emp}::${ds}::pranzo`], 'pranzo') || '—')
       row.push(shiftLabel(data[`${emp}::${ds}::cena`], 'cena') || '—')
     })
@@ -188,29 +199,15 @@ function buildAndDownloadPDF(data, from, to, employees) {
     })
   })
 
-  const df = fmtDate(new Date(from)).replace(/\//g,'')
-  const dt = fmtDate(new Date(to)).replace(/\//g,'')
+  const df = fmtDate(localDate(from)).replace(/\//g,'')
+  const dt = fmtDate(localDate(to)).replace(/\//g,'')
   doc.save(`turni_${df}${from !== to ? '_'+dt : ''}.pdf`)
 }
 
-// ── ICS — con fuso orario Europe/Rome per evitare scorrimenti di data ─────────
-function icsDateTime(date, timeStr, durationHours) {
-  const [h, m] = timeStr.split(':').map(Number)
-  const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1)
-  const day = pad(date.getDate())
-
-  let endH = h + Math.floor(durationHours)
-  let endM = m + Math.round((durationHours % 1) * 60)
-  if (endM >= 60) { endH += 1; endM -= 60 }
-
-  const startStr = `${year}${month}${day}T${pad(h)}${pad(m)}00`
-  const endStr   = `${year}${month}${day}T${pad(endH)}${pad(endM)}00`
-  return { start: startStr, end: endStr }
-}
-
+// ── ICS — fuso orario Europe/Rome, date costruite localmente ──────────────────
 function buildAndDownloadICS(data, from, to, employees) {
   const dates = getDates(from, to)
+
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -242,7 +239,8 @@ function buildAndDownloadICS(data, from, to, employees) {
 
   employees.forEach(emp => {
     dates.forEach(d => {
-      const ds = toDateStr(d)
+      // Usa localDateStr invece di toDateStr/toISOString per evitare scorrimento UTC
+      const ds = localDateStr(d)
       ;['pranzo', 'cena'].forEach(service => {
         const val = data[`${emp}::${ds}::${service}`]
         if (!val || val === 'F') return
@@ -250,15 +248,26 @@ function buildAndDownloadICS(data, from, to, employees) {
         const timeStr = map[val]
         if (!timeStr) return
 
+        const [h, m] = timeStr.split(':').map(Number)
         const duration = service === 'pranzo' ? 2.5 : 3.5
-        const { start, end } = icsDateTime(d, timeStr, duration)
+        let endH = h + Math.floor(duration)
+        let endM = m + Math.round((duration % 1) * 60)
+        if (endM >= 60) { endH += 1; endM -= 60 }
+
+        // Data costruita localmente: anno/mese/giorno dalla data locale
+        const y = d.getFullYear()
+        const mo = pad(d.getMonth() + 1)
+        const dy = pad(d.getDate())
+        const startStr = `${y}${mo}${dy}T${pad(h)}${pad(m)}00`
+        const endStr   = `${y}${mo}${dy}T${pad(endH)}${pad(endM)}00`
+
         const empShort = emp.split(' ')[0]
         const summary = `${empShort} - ${service === 'pranzo' ? 'Pranzo' : 'Cena'} ${timeStr}`
 
         lines.push('BEGIN:VEVENT')
         lines.push(`UID:${uid_base}-${eventCount++}@arcobaleno`)
-        lines.push(`DTSTART;TZID=Europe/Rome:${start}`)
-        lines.push(`DTEND;TZID=Europe/Rome:${end}`)
+        lines.push(`DTSTART;TZID=Europe/Rome:${startStr}`)
+        lines.push(`DTEND;TZID=Europe/Rome:${endStr}`)
         lines.push(`SUMMARY:${summary}`)
         lines.push(`DESCRIPTION:Turno ${service} - ${emp}`)
         lines.push('END:VEVENT')
@@ -271,10 +280,8 @@ function buildAndDownloadICS(data, from, to, employees) {
   const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  const df = from.replace(/-/g,'')
-  const dt2 = to.replace(/-/g,'')
   a.href = url
-  a.download = `turni_${df}${from !== to ? '_'+dt2 : ''}.ics`
+  a.download = `turni_${from.replace(/-/g,'')}${from !== to ? '_'+to.replace(/-/g,'') : ''}.ics`
   a.click()
   URL.revokeObjectURL(url)
 }
