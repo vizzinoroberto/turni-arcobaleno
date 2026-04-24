@@ -99,13 +99,16 @@ export default function RichiestaCambioModal({ data, onClose }) {
           <>
             <div className={styles.section}>
               <label className={styles.label}>Il tuo nome *</label>
-              <input
-                type="text"
-                className={styles.input}
-                placeholder="Es. Francesca Novello"
+              <select
+                className={styles.select}
                 value={nome}
                 onChange={e => setNome(e.target.value)}
-              />
+              >
+                <option value="">— Seleziona il tuo nome —</option>
+                {EMPLOYEES.map(e => (
+                  <option key={e} value={e}>{e}</option>
+                ))}
+              </select>
             </div>
 
             <div className={styles.section}>
