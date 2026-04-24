@@ -21,11 +21,11 @@ function fmtRichiestaDate(iso) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
 }
 
-export default function RichiesteAdmin() {
+export default function RichiesteAdmin({ onPendingCountChange }) {
   const [richieste, setRichieste] = useState([])
   const [loading, setLoading] = useState(true)
   const [showStorico, setShowStorico] = useState(false)
-  const [actionLoading, setActionLoading] = useState(null) // id della richiesta in corso
+  const [actionLoading, setActionLoading] = useState(null)
   const [motivoRifiuto, setMotivoRifiuto] = useState({})
   const [showMotivoFor, setShowMotivoFor] = useState(null)
 
@@ -36,9 +36,15 @@ export default function RichiesteAdmin() {
       .select('*')
       .order('data_richiesta', { ascending: false })
     if (error) { setLoading(false); return }
-    setRichieste(data || [])
+    const lista = data || []
+    setRichieste(lista)
     setLoading(false)
-  }, [])
+    // Notifica al padre il numero di richieste in sospeso
+    if (onPendingCountChange) {
+      const pending = lista.filter(r => r.stato === 'in_sospeso').length
+      onPendingCountChange(pending)
+    }
+  }, [onPendingCountChange])
 
   useEffect(() => { loadRichieste() }, [loadRichieste])
 
@@ -49,7 +55,6 @@ export default function RichiesteAdmin() {
     if (!confirm(`Approvare la richiesta di ${r.nome_richiedente}? I turni verranno modificati automaticamente.`)) return
     setActionLoading(r.id)
 
-    // 1. Leggi i valori dei turni coinvolti
     const keyA = `${r.nome_richiedente}::${r.data_turno_da_cedere}::${r.servizio_da_cedere}`
     const valoreA = (await supabase.from('turni').select('valore').eq('chiave', keyA).maybeSingle()).data?.valore
 
@@ -60,7 +65,6 @@ export default function RichiesteAdmin() {
     }
 
     if (r.tipo === 'cessione') {
-      // CESSIONE: il turno passa al collega, quello del richiedente sparisce
       const keyB = `${r.nome_collega}::${r.data_turno_da_cedere}::${r.servizio_da_cedere}`
       const ops = [
         supabase.from('turni').delete().eq('chiave', keyA),
@@ -73,18 +77,14 @@ export default function RichiesteAdmin() {
         return
       }
     } else {
-      // SCAMBIO: i due turni vengono scambiati
       const keyB = `${r.nome_collega}::${r.data_turno_collega}::${r.servizio_collega}`
       const valoreB = (await supabase.from('turni').select('valore').eq('chiave', keyB).maybeSingle()).data?.valore
 
-      // I turni dei nuovi possessori
-      const newKeyA = `${r.nome_richiedente}::${r.data_turno_collega}::${r.servizio_collega}` // richiedente prende lo slot del collega
-      const newKeyB = `${r.nome_collega}::${r.data_turno_da_cedere}::${r.servizio_da_cedere}` // collega prende lo slot del richiedente
+      const newKeyA = `${r.nome_richiedente}::${r.data_turno_collega}::${r.servizio_collega}`
+      const newKeyB = `${r.nome_collega}::${r.data_turno_da_cedere}::${r.servizio_da_cedere}`
 
       const ops = [
-        // Cancella i vecchi
         supabase.from('turni').delete().eq('chiave', keyA),
-        // Inserisci i nuovi
         supabase.from('turni').upsert({ chiave: newKeyB, valore: valoreA }, { onConflict: 'chiave' }),
       ]
       if (valoreB) {
@@ -99,7 +99,6 @@ export default function RichiesteAdmin() {
       }
     }
 
-    // Aggiorna stato richiesta
     await supabase.from('richieste_cambio').update({
       stato: 'approvata',
       data_gestione: new Date().toISOString()

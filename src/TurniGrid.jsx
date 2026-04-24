@@ -55,7 +55,7 @@ function cellBg(ei, d) {
 export default function TurniGrid({ isAdmin, onLogout }) {
   const [data, setData] = useState({})
   const [notes, setNotes] = useState({})
-  const [tab, setTab] = useState('turni') // 'turni' | 'statistiche' | 'richieste'
+  const [tab, setTab] = useState('turni')
   const [mode, setMode] = useState(isAdmin ? 'admin' : 'staff')
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()))
   const [syncStatus, setSyncStatus] = useState({ msg: '', cls: '' })
@@ -70,15 +70,22 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const weekKey = toDateStr(currentMonday)
   const days = getWeekDays(currentMonday)
 
+  // Funzione separata per caricare solo il conteggio richieste (anche al cambio tab)
+  const loadRichiestePending = useCallback(async () => {
+    if (!isAdmin) return
+    const { count } = await supabase
+      .from('richieste_cambio')
+      .select('id', { count: 'exact', head: true })
+      .eq('stato', 'in_sospeso')
+    setRichiestePending(count || 0)
+  }, [isAdmin])
+
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
     const ops = [
       supabase.from('turni').select('chiave, valore'),
       supabase.from('note_settimana').select('settimana, testo')
     ]
-    if (isAdmin) {
-      ops.push(supabase.from('richieste_cambio').select('id', { count: 'exact', head: true }).eq('stato', 'in_sospeso'))
-    }
     const results = await Promise.all(ops)
     if (results[0].error || results[1].error) { setSyncStatus({ msg: 'Errore caricamento ✗', cls: styles.err }); return }
     const obj = {}
@@ -87,9 +94,9 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     const noteObj = {}
     results[1].data.forEach(r => { noteObj[r.settimana] = r.testo })
     setNotes(noteObj)
-    if (isAdmin && results[2]) setRichiestePending(results[2].count || 0)
     setSyncStatus({ msg: 'Sincronizzato ✓', cls: styles.ok })
-  }, [isAdmin])
+    loadRichiestePending()
+  }, [loadRichiestePending])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -171,6 +178,22 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     setSyncStatus({ msg: 'Ferie salvate ✓', cls: styles.ok })
   }
 
+  // Quando viene approvata/rifiutata/eliminata una richiesta, ricarico anche i dati turni
+  // perché un'approvazione modifica il database
+  function handlePendingCountChange(newCount) {
+    setRichiestePending(newCount)
+    // Ricarica i turni se siamo in admin (potrebbero essere stati modificati da un'approvazione)
+    if (newCount !== richiestePending) {
+      supabase.from('turni').select('chiave, valore').then(({ data: rows }) => {
+        if (rows) {
+          const obj = {}
+          rows.forEach(r => { obj[r.chiave] = r.valore })
+          setData(obj)
+        }
+      })
+    }
+  }
+
   function adminOptions(service, val) {
     const opts = service === 'pranzo'
       ? [['','—'],['Q','Q'],['W','W'],['F','F']]
@@ -241,7 +264,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
       {tab === 'statistiche' && isAdmin && <Statistiche data={data} />}
 
-      {tab === 'richieste' && isAdmin && <RichiesteAdmin />}
+      {tab === 'richieste' && isAdmin && <RichiesteAdmin onPendingCountChange={handlePendingCountChange} />}
 
       {tab === 'turni' && (
         <>
