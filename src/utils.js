@@ -20,6 +20,8 @@ export const CENA_MAP = {
   '5': '19:00', '6': '19:30', '7': '19:30',
 }
 
+function pad(n) { return String(n).padStart(2, '0') }
+
 export function getMonday(d) {
   const day = d.getDay()
   const diff = day === 0 ? -6 : 1 - day
@@ -35,7 +37,11 @@ export function addDays(d, n) {
   return r
 }
 
-export function toDateStr(d) { return d.toISOString().slice(0, 10) }
+// FIX BUG: usa data locale invece di toISOString() che converte in UTC
+// causando shift di -1 giorno nei fusi orari positivi (Italia UTC+1/+2)
+export function toDateStr(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+}
 
 export function formatDateVertical(d) {
   const dd = String(d.getDate()).padStart(2, '0')
