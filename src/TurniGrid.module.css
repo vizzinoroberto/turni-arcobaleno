@@ -1,9 +1,5 @@
-.app {
-  padding: 14px;
-  min-height: 100vh;
-}
+.app { padding: 14px; min-height: 100vh; }
 
-/* TOP BAR */
 .topBar {
   display: flex;
   align-items: center;
@@ -16,11 +12,7 @@
   padding: 10px 14px;
 }
 
-.titleText {
-  font-size: 15px;
-  font-weight: bold;
-  color: #222;
-}
+.titleText { font-size: 15px; font-weight: bold; color: #222; }
 
 .navBtn {
   padding: 5px 12px;
@@ -29,11 +21,9 @@
   border-radius: 5px;
   background: #fff;
   color: #222;
+  cursor: pointer;
 }
-
-.navBtn:hover {
-  background: #f0f0f0;
-}
+.navBtn:hover { background: #f0f0f0; }
 
 .weekLabel {
   font-size: 12px;
@@ -56,20 +46,12 @@
   background: #fff;
   color: #555;
   border: none;
+  cursor: pointer;
 }
 
-.modeBtn.active {
-  background: #4a90d9;
-  color: #fff;
-  font-weight: bold;
-}
+.modeBtn.active { background: #4a90d9; color: #fff; font-weight: bold; }
 
-.syncStatus {
-  font-size: 11px;
-  color: #aaa;
-  margin-left: auto;
-}
-
+.syncStatus { font-size: 11px; color: #aaa; margin-left: auto; }
 .ok { color: #27ae60; }
 .err { color: #c0392b; }
 
@@ -79,11 +61,44 @@
   background: none;
   border: none;
   text-decoration: underline;
+  cursor: pointer;
 }
-
 .logoutBtn:hover { color: #555; }
 
-/* STAFF NOTE */
+.mainTabs {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mainTab {
+  padding: 5px 18px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f5f5f5;
+  color: #666;
+  border: none;
+  cursor: pointer;
+  border-right: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mainTab:last-child { border-right: none; }
+.mainTab:hover { background: #ebebeb; }
+.mainTabActive { background: #222; color: #fff; }
+
+.tabBadge {
+  background: #c0392b;
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
 .staffNote {
   background: #e8f4fd;
   border: 1px solid #bee3f8;
@@ -105,11 +120,10 @@
   border-radius: 5px;
   background: #fff;
   color: #4a90d9;
+  cursor: pointer;
 }
-
 .refreshBtn:hover { background: #e8f4fd; }
 
-/* TABLE */
 .tableWrap {
   overflow-x: auto;
   border: 1px solid #ddd;
@@ -117,14 +131,9 @@
   background: #fff;
 }
 
-.table {
-  border-collapse: collapse;
-  font-size: 12px;
-  width: 100%;
-}
+.table { border-collapse: collapse; font-size: 12px; width: 100%; }
 
-.table th,
-.table td {
+.table th, .table td {
   border: 1px solid #e0e0e0;
   text-align: center;
 }
@@ -173,9 +182,7 @@
   margin-top: 4px;
 }
 
-.dow.weekend {
-  color: #c0392b;
-}
+.dow.weekend { color: #c0392b; }
 
 .pcHeader {
   font-size: 9px;
@@ -185,15 +192,10 @@
   width: 38px;
 }
 
-.cellPair {
-  padding: 2px;
-  width: 38px;
-}
+.cellPair { padding: 2px; width: 38px; }
 
-/* weekendCol e sundayCol rimossi: il colore cella è gestito via style inline per dipendente */
-
-.rowPranzo td { border-bottom: none; }
-.rowCena td { border-top: 1px dashed #e0e0e0; }
+.rowPranzo td { border-bottom: none; height: 26px; vertical-align: middle; }
+.rowCena td { border-top: 1px dashed #e0e0e0; height: 22px; vertical-align: middle; }
 
 .cellDisplay {
   display: flex;
@@ -202,16 +204,8 @@
   gap: 1px;
 }
 
-.timeStr {
-  font-size: 11px;
-  font-weight: bold;
-  color: #222;
-}
-
-.shiftNum {
-  font-size: 10px;
-  color: #888;
-}
+.timeStr { font-size: 11px; font-weight: bold; color: #222; }
+.shiftNum { font-size: 10px; color: #888; }
 
 .ferieBadge {
   font-size: 9px;
@@ -223,10 +217,7 @@
   border: 1px solid #ffc107;
 }
 
-.emptyCell {
-  color: #ccc;
-  font-size: 10px;
-}
+.emptyCell { color: #ccc; font-size: 10px; }
 
 .shiftInput {
   width: 34px;
@@ -239,24 +230,10 @@
   cursor: pointer;
 }
 
-.shiftInput:focus {
-  outline: none;
-  border-color: #4a90d9;
-}
+.shiftInput:focus { outline: none; border-color: #4a90d9; }
+.hasValue { background: #e8f0fe; color: #1a56db; border-color: #93c5fd; }
+.hasFerie { background: #fef3cd; color: #856404; border-color: #ffc107; }
 
-.hasValue {
-  background: #e8f0fe;
-  color: #1a56db;
-  border-color: #93c5fd;
-}
-
-.hasFerie {
-  background: #fef3cd;
-  color: #856404;
-  border-color: #ffc107;
-}
-
-/* LEGENDA */
 .legend {
   display: flex;
   gap: 10px;
@@ -271,38 +248,8 @@
   padding: 8px 14px;
 }
 
-.legend strong {
-  color: #333;
-}
+.legend strong { color: #333; }
 
-/* ROW HEIGHTS */
-.rowPranzo td { height: 26px; vertical-align: middle; }
-.rowCena td { height: 22px; vertical-align: middle; }
-
-/* MAIN TABS */
-.mainTabs {
-  display: flex;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.mainTab {
-  padding: 5px 18px;
-  font-size: 12px;
-  font-weight: 500;
-  background: #f5f5f5;
-  color: #666;
-  border: none;
-  cursor: pointer;
-  border-right: 1px solid #ccc;
-}
-
-.mainTab:last-child { border-right: none; }
-.mainTab:hover { background: #ebebeb; }
-.mainTabActive { background: #222; color: #fff; }
-
-/* NOTE */
 .noteBox {
   background: #fff;
   border: 1px solid #ddd;
@@ -314,11 +261,7 @@
   gap: 8px;
 }
 
-.noteLabel {
-  font-size: 12px;
-  font-weight: bold;
-  color: #555;
-}
+.noteLabel { font-size: 12px; font-weight: bold; color: #555; }
 
 .noteInput {
   width: 100%;
@@ -332,7 +275,6 @@
   color: #333;
   line-height: 1.5;
 }
-
 .noteInput:focus { border-color: #4a90d9; }
 
 .noteDisplay {
@@ -346,24 +288,15 @@
   gap: 6px;
 }
 
-.noteDisplayLabel {
-  font-size: 12px;
-  font-weight: bold;
-  color: #856404;
-}
+.noteDisplayLabel { font-size: 12px; font-weight: bold; color: #856404; }
+.noteDisplayText { font-size: 13px; color: #444; line-height: 1.6; white-space: pre-wrap; }
 
-.noteDisplayText {
-  font-size: 13px;
-  color: #444;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-/* EXPORT BAR */
 .exportBar {
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .exportBtn {
@@ -377,7 +310,6 @@
   font-weight: 500;
   transition: background 0.15s;
 }
-
 .exportBtn:hover { background: #1e8449; }
 
 .ferieBtn {
@@ -392,3 +324,16 @@
   transition: background 0.15s;
 }
 .ferieBtn:hover { background: #ca6f1e; }
+
+.cambioBtn {
+  padding: 7px 18px;
+  font-size: 13px;
+  background: #4a90d9;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.cambioBtn:hover { background: #357abd; }

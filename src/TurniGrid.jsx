@@ -7,6 +7,8 @@ import {
 import Statistiche from './Statistiche.jsx'
 import ExportModal from './ExportModal.jsx'
 import FerieModal from './FerieModal.jsx'
+import RichiestaCambioModal from './RichiestaCambioModal.jsx'
+import RichiesteAdmin from './RichiesteAdmin.jsx'
 import styles from './TurniGrid.module.css'
 
 const FESTIVI = new Set(['04-25','05-01','06-02','08-15','11-01','12-08','12-24','12-25','12-26','12-31'])
@@ -36,7 +38,6 @@ function formatDateFull(d) {
   return `${dd}/${mm}/${yy}`
 }
 
-// Scurisce un colore hex RGB di `amount` per sabato/domenica
 function darken(hex, amount) {
   const r = Math.max(0, parseInt(hex.slice(1,3),16) - amount)
   const g = Math.max(0, parseInt(hex.slice(3,5),16) - amount)
@@ -54,12 +55,14 @@ function cellBg(ei, d) {
 export default function TurniGrid({ isAdmin, onLogout }) {
   const [data, setData] = useState({})
   const [notes, setNotes] = useState({})
-  const [tab, setTab] = useState('turni')
+  const [tab, setTab] = useState('turni') // 'turni' | 'statistiche' | 'richieste'
   const [mode, setMode] = useState(isAdmin ? 'admin' : 'staff')
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()))
   const [syncStatus, setSyncStatus] = useState({ msg: '', cls: '' })
   const [showExport, setShowExport] = useState(false)
   const [showFerie, setShowFerie] = useState(false)
+  const [showCambio, setShowCambio] = useState(false)
+  const [richiestePending, setRichiestePending] = useState(0)
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
   const pendingRef = useRef({})
@@ -69,19 +72,24 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
-    const [{ data: rows, error }, { data: noteRows, error: noteErr }] = await Promise.all([
+    const ops = [
       supabase.from('turni').select('chiave, valore'),
       supabase.from('note_settimana').select('settimana, testo')
-    ])
-    if (error || noteErr) { setSyncStatus({ msg: 'Errore caricamento ✗', cls: styles.err }); return }
+    ]
+    if (isAdmin) {
+      ops.push(supabase.from('richieste_cambio').select('id', { count: 'exact', head: true }).eq('stato', 'in_sospeso'))
+    }
+    const results = await Promise.all(ops)
+    if (results[0].error || results[1].error) { setSyncStatus({ msg: 'Errore caricamento ✗', cls: styles.err }); return }
     const obj = {}
-    rows.forEach(r => { obj[r.chiave] = r.valore })
+    results[0].data.forEach(r => { obj[r.chiave] = r.valore })
     setData(obj)
     const noteObj = {}
-    noteRows.forEach(r => { noteObj[r.settimana] = r.testo })
+    results[1].data.forEach(r => { noteObj[r.settimana] = r.testo })
     setNotes(noteObj)
+    if (isAdmin && results[2]) setRichiestePending(results[2].count || 0)
     setSyncStatus({ msg: 'Sincronizzato ✓', cls: styles.ok })
-  }, [])
+  }, [isAdmin])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -196,23 +204,30 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     <div className={styles.app}>
       <div className={styles.topBar}>
         <span className={styles.titleText}>🍕 Turni Pizzeria Arcobaleno</span>
+
         {isAdmin && (
           <div className={styles.mainTabs}>
             <button className={`${styles.mainTab} ${tab==='turni'?styles.mainTabActive:''}`} onClick={() => setTab('turni')}>Turni</button>
             <button className={`${styles.mainTab} ${tab==='statistiche'?styles.mainTabActive:''}`} onClick={() => setTab('statistiche')}>Statistiche</button>
+            <button className={`${styles.mainTab} ${tab==='richieste'?styles.mainTabActive:''}`} onClick={() => setTab('richieste')}>
+              Richieste {richiestePending > 0 && <span className={styles.tabBadge}>{richiestePending}</span>}
+            </button>
           </div>
         )}
+
         {tab === 'turni' && <>
           <button className={styles.navBtn} onClick={() => changeWeek(m => addDays(m,-7))}>←</button>
           <span className={styles.weekLabel}>{formatDateFull(days[0])} – {formatDateFull(days[6])}</span>
           <button className={styles.navBtn} onClick={() => changeWeek(m => addDays(m,7))}>→</button>
         </>}
+
         {isAdmin && tab === 'turni' && (
           <div className={styles.modeToggle}>
             <button className={`${styles.modeBtn} ${mode==='admin'?styles.active:''}`} onClick={() => setMode('admin')}>Admin</button>
             <button className={`${styles.modeBtn} ${mode==='staff'?styles.active:''}`} onClick={() => setMode('staff')}>Dipendenti</button>
           </div>
         )}
+
         <span className={`${styles.syncStatus} ${syncStatus.cls}`}>{syncStatus.msg}</span>
         <button className={styles.logoutBtn} onClick={onLogout}>Esci</button>
       </div>
@@ -225,6 +240,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       )}
 
       {tab === 'statistiche' && isAdmin && <Statistiche data={data} />}
+
+      {tab === 'richieste' && isAdmin && <RichiesteAdmin />}
 
       {tab === 'turni' && (
         <>
@@ -312,6 +329,9 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             {isAdmin && mode === 'admin' && (
               <button className={styles.ferieBtn} onClick={() => setShowFerie(true)}>🏖 Imposta FERIE</button>
             )}
+            {!isAdmin && (
+              <button className={styles.cambioBtn} onClick={() => setShowCambio(true)}>🔄 Richiedi cambio turno</button>
+            )}
             <button className={styles.exportBtn} onClick={() => setShowExport(true)}>⬇ Scarica turni</button>
           </div>
         </>
@@ -319,6 +339,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
       {showExport && <ExportModal data={data} currentMonday={currentMonday} onClose={() => setShowExport(false)} />}
       {showFerie && <FerieModal currentMonday={currentMonday} onClose={() => setShowFerie(false)} onApply={applyFerie} />}
+      {showCambio && <RichiestaCambioModal data={data} onClose={() => setShowCambio(false)} />}
     </div>
   )
 }
