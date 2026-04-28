@@ -81,7 +81,10 @@ export default function RichiestaCambioModal({ data, onClose }) {
     // Notifica email admin (fire & forget)
     fetch('https://rvzikapecolurexiaoqs.supabase.co/functions/v1/notifica-richiesta', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2emtapeY29sdXJleGlhb3FzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMzY1MTUsImV4cCI6MjA5MDYxMjUxNX0.BmWfgJ7ycRA3O5zSC4q2bba6VBtxOUjUSO7e1xHxpf4',
+      },
       body: JSON.stringify(payload),
     }).catch(() => {})
 
