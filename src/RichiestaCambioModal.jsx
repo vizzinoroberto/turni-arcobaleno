@@ -24,32 +24,29 @@ export default function RichiestaCambioModal({ data, onClose }) {
   const [errore, setErrore] = useState('')
   const [inviata, setInviata] = useState(false)
 
-  // Mostra le prossime 4 settimane di slot disponibili per scegliere
-  const today = new Date()
-  const fromMonday = getMonday(today)
-  const upcomingDates = useMemo(() => {
-    const dates = []
-    for (let i = 0; i < 28; i++) {
-      const d = addDays(fromMonday, i)
-      dates.push({ str: toDateStr(d), date: d })
-    }
-    return dates
-  }, [fromMonday])
+  const todayStr = toDateStr(new Date())
 
-  // Slot del richiedente: solo i turni esistenti del nome inserito
+  // Slot del richiedente: tutti i turni futuri presenti in data
   const turniRichiedente = useMemo(() => {
     if (!nome.trim()) return []
+    const prefix = `${nome.trim()}::`
+    const seen = new Set()
     const slots = []
-    upcomingDates.forEach(({ str, date }) => {
-      ['pranzo','cena'].forEach(service => {
-        const val = data[`${nome.trim()}::${str}::${service}`]
-        if (val && val !== 'F') {
-          slots.push({ dateStr: str, service, label: fmtSlot(str, service) })
-        }
-      })
+    Object.keys(data).forEach(key => {
+      if (!key.startsWith(prefix)) return
+      const [, dateStr, service] = key.split('::')
+      if (!dateStr || dateStr < todayStr) return
+      const slotKey = `${dateStr}|${service}`
+      if (seen.has(slotKey)) return
+      seen.add(slotKey)
+      const val = data[key]
+      if (val && val !== 'F') {
+        slots.push({ dateStr, service, label: fmtSlot(dateStr, service) })
+      }
     })
+    slots.sort((a, b) => a.dateStr.localeCompare(b.dateStr) || a.service.localeCompare(b.service))
     return slots
-  }, [nome, data, upcomingDates])
+  }, [nome, data, todayStr])
 
   const isValid = nome.trim() && dataCedo && servizioCedo && collega &&
     (tipo === 'cessione' || (dataCollega && servizioCollega))
@@ -143,7 +140,7 @@ export default function RichiestaCambioModal({ data, onClose }) {
               {nome.trim() === '' ? (
                 <p className={styles.hintWarn}>Inserisci prima il tuo nome</p>
               ) : turniRichiedente.length === 0 ? (
-                <p className={styles.hintWarn}>Nessun turno trovato per "{nome}" nelle prossime 4 settimane</p>
+                <p className={styles.hintWarn}>Nessun turno trovato per "{nome}"</p>
               ) : (
                 <select
                   className={styles.select}
