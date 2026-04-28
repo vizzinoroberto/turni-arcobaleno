@@ -26,10 +26,9 @@ export default function RichiestaCambioModal({ data, onClose }) {
 
   const todayStr = toDateStr(new Date())
 
-  // Slot del richiedente: tutti i turni futuri presenti in data
-  const turniRichiedente = useMemo(() => {
-    if (!nome.trim()) return []
-    const prefix = `${nome.trim()}::`
+  function turniDipendente(nomeDip) {
+    if (!nomeDip.trim()) return []
+    const prefix = `${nomeDip.trim()}::`
     const seen = new Set()
     const slots = []
     Object.keys(data).forEach(key => {
@@ -46,7 +45,10 @@ export default function RichiestaCambioModal({ data, onClose }) {
     })
     slots.sort((a, b) => a.dateStr.localeCompare(b.dateStr) || a.service.localeCompare(b.service))
     return slots
-  }, [nome, data, todayStr])
+  }
+
+  const turniRichiedente = useMemo(() => turniDipendente(nome), [nome, data, todayStr])
+  const turniCollega = useMemo(() => turniDipendente(collega), [collega, data, todayStr])
 
   const isValid = nome.trim() && dataCedo && servizioCedo && collega &&
     (tipo === 'cessione' || (dataCollega && servizioCollega))
@@ -107,13 +109,16 @@ export default function RichiestaCambioModal({ data, onClose }) {
           <>
             <div className={styles.section}>
               <label className={styles.label}>Il tuo nome *</label>
-              <input
-                type="text"
-                className={styles.input}
-                placeholder="Es. Francesca Novello"
+              <select
+                className={styles.select}
                 value={nome}
                 onChange={e => setNome(e.target.value)}
-              />
+              >
+                <option value="">— Seleziona il tuo nome —</option>
+                {EMPLOYEES.map(e => (
+                  <option key={e} value={e}>{e}</option>
+                ))}
+              </select>
             </div>
 
             <div className={styles.section}>
@@ -164,7 +169,7 @@ export default function RichiestaCambioModal({ data, onClose }) {
               <select
                 className={styles.select}
                 value={collega}
-                onChange={e => setCollega(e.target.value)}
+                onChange={e => { setCollega(e.target.value); setDataCollega(''); setServizioCollega('cena') }}
               >
                 <option value="">— Seleziona collega —</option>
                 {EMPLOYEES.filter(e => e !== nome.trim()).map(e => (
@@ -176,22 +181,26 @@ export default function RichiestaCambioModal({ data, onClose }) {
             {tipo === 'scambio' && (
               <div className={styles.section}>
                 <label className={styles.label}>Turno del collega che prendo io *</label>
-                <div className={styles.row}>
-                  <input
-                    type="date"
-                    className={styles.dateInput}
-                    value={dataCollega}
-                    onChange={e => setDataCollega(e.target.value)}
-                  />
+                {!collega ? (
+                  <p className={styles.hintWarn}>Seleziona prima il collega</p>
+                ) : turniCollega.length === 0 ? (
+                  <p className={styles.hintWarn}>Nessun turno trovato per "{collega}"</p>
+                ) : (
                   <select
-                    className={styles.selectSmall}
-                    value={servizioCollega}
-                    onChange={e => setServizioCollega(e.target.value)}
+                    className={styles.select}
+                    value={`${dataCollega}|${servizioCollega}`}
+                    onChange={e => {
+                      const [d, s] = e.target.value.split('|')
+                      setDataCollega(d || '')
+                      setServizioCollega(s || 'cena')
+                    }}
                   >
-                    <option value="pranzo">Pranzo</option>
-                    <option value="cena">Cena</option>
+                    <option value="|">— Seleziona un turno —</option>
+                    {turniCollega.map(s => (
+                      <option key={s.dateStr + s.service} value={`${s.dateStr}|${s.service}`}>{s.label}</option>
+                    ))}
                   </select>
-                </div>
+                )}
               </div>
             )}
 
