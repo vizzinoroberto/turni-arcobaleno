@@ -205,7 +205,7 @@ function buildAndDownloadPDF(data, from, to, employees) {
 }
 
 // ── ICS — fuso orario Europe/Rome, date costruite localmente ──────────────────
-function buildAndDownloadICS(data, from, to, employees) {
+async function buildAndDownloadICS(data, from, to, employees) {
   const dates = getDates(from, to)
 
   const lines = [
@@ -239,7 +239,6 @@ function buildAndDownloadICS(data, from, to, employees) {
 
   employees.forEach(emp => {
     dates.forEach(d => {
-      // Usa localDateStr invece di toDateStr/toISOString per evitare scorrimento UTC
       const ds = localDateStr(d)
       ;['pranzo', 'cena'].forEach(service => {
         const val = data[`${emp}::${ds}::${service}`]
@@ -254,7 +253,6 @@ function buildAndDownloadICS(data, from, to, employees) {
         let endM = m + Math.round((duration % 1) * 60)
         if (endM >= 60) { endH += 1; endM -= 60 }
 
-        // Data costruita localmente: anno/mese/giorno dalla data locale
         const y = d.getFullYear()
         const mo = pad(d.getMonth() + 1)
         const dy = pad(d.getDate())
@@ -277,11 +275,29 @@ function buildAndDownloadICS(data, from, to, employees) {
 
   lines.push('END:VCALENDAR')
 
+  const filename = `turni_${from.replace(/-/g,'')}${from !== to ? '_'+to.replace(/-/g,'') : ''}.ics`
   const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' })
+
+  // Su Android Chrome la Web Share API apre direttamente il foglio di condivisione
+  // del sistema (incluso Google Calendar), evitando il problema del file scaricato
+  // che Android non associa automaticamente all'app calendario.
+  if (navigator.canShare) {
+    const file = new File([blob], filename, { type: 'text/calendar' })
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Turni' })
+        return
+      } catch (e) {
+        if (e.name === 'AbortError') return
+        // in caso di errore inatteso cade nel download classico
+      }
+    }
+  }
+
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `turni_${from.replace(/-/g,'')}${from !== to ? '_'+to.replace(/-/g,'') : ''}.ics`
+  a.download = filename
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -306,7 +322,7 @@ export default function ExportModal({ data, currentMonday, onClose }) {
 
   function doXLS() { buildAndDownloadXLS(data, from, to, getEmployees()); onClose() }
   function doPDF() { buildAndDownloadPDF(data, from, to, getEmployees()); onClose() }
-  function doICS() { buildAndDownloadICS(data, from, to, getEmployees()); onClose() }
+  async function doICS() { await buildAndDownloadICS(data, from, to, getEmployees()); onClose() }
 
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
