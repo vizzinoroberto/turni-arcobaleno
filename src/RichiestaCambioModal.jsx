@@ -77,6 +77,14 @@ export default function RichiestaCambioModal({ data, onClose }) {
       setErrore('Errore nell\'invio: ' + error.message)
       return
     }
+
+    // Notifica email admin (fire & forget)
+    fetch('https://rvzikapecolurexiaoqs.supabase.co/functions/v1/notifica-richiesta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => {})
+
     setInviata(true)
     setTimeout(() => onClose(), 1800)
   }
@@ -99,16 +107,13 @@ export default function RichiestaCambioModal({ data, onClose }) {
           <>
             <div className={styles.section}>
               <label className={styles.label}>Il tuo nome *</label>
-              <select
-                className={styles.select}
+              <input
+                type="text"
+                className={styles.input}
+                placeholder="Es. Francesca Novello"
                 value={nome}
                 onChange={e => setNome(e.target.value)}
-              >
-                <option value="">— Seleziona il tuo nome —</option>
-                {EMPLOYEES.map(e => (
-                  <option key={e} value={e}>{e}</option>
-                ))}
-              </select>
+              />
             </div>
 
             <div className={styles.section}>
