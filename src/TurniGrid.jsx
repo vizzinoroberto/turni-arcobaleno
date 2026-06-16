@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 import {
-  EMPLOYEES, DOW_LABELS, getMonday, addDays, toDateStr,
+  EMPLOYEES, EMPLOYEE_PERIODS, DOW_LABELS, getMonday, addDays, toDateStr,
   formatDateVertical, isWeekend, isSunday, getWeekDays, shiftToDisplay
 } from './utils'
 import Statistiche from './Statistiche.jsx'
@@ -225,6 +225,15 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const currentNote = notes[weekKey] || ''
   const isStaffView = mode === 'staff'
 
+  // Filtra dipendenti attivi per la settimana visualizzata (usa il lunedì come riferimento)
+  const visibleEmployees = EMPLOYEES.filter(emp => {
+    const period = EMPLOYEE_PERIODS[emp]
+    if (!period) return true
+    if (period.to && toDateStr(currentMonday) > period.to) return false
+    if (period.from && toDateStr(addDays(currentMonday, 6)) < period.from) return false
+    return true
+  })
+
   return (
     <div className={styles.app}>
       <div className={styles.topBar}>
@@ -290,7 +299,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                 </tr>
               </thead>
               <tbody>
-                {EMPLOYEES.map((emp, ei) =>
+                {visibleEmployees.map((emp, ei) =>
                   ['pranzo','cena'].map((service, si) => (
                     <tr key={`${emp}-${service}`} className={si===0?styles.rowPranzo:styles.rowCena}>
                       {si===0 && (
