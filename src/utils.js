@@ -15,6 +15,11 @@ export function isSummer(d) {
   const m = d.getMonth() + 1 // 1-12
   return m >= 6 && m <= 9
 }
+
+// Data di fine contratto per dipendenti con validità limitata
+export const EMPLOYEE_PERIODS = {
+  'Nicole Cavalli': { to: '2026-09-30' }
+}
 export const PASSWORD_STAFF = 'arcoturni'
 
 export const EMPLOYEES = [

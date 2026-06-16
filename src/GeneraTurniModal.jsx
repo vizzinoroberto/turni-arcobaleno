@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { EMPLOYEES, getMonday, addDays, toDateStr } from './utils'
+import { EMPLOYEES, addDays, toDateStr } from './utils'
 import { generaTurni } from './generaTurni'
 import styles from './GeneraTurniModal.module.css'
 
-function getNextSaturday(from) {
-  const d = new Date(from)
-  while (d.getDay() !== 6) d.setDate(d.getDate() + 1)
-  return d
-}
+const NICOLE_END = '2026-09-30'
 
 function fmt(dateStr) {
   const [y, m, d] = dateStr.split('-')
@@ -23,25 +19,27 @@ function countWeeks(fromStr, toStr) {
 
 export default function GeneraTurniModal({ onClose, onApply }) {
   const today = toDateStr(new Date())
-  const defaultTo = toDateStr(addDays(new Date(), 27)) // ~4 settimane
+  const defaultTo = toDateStr(addDays(new Date(), 27))
 
   const [from, setFrom] = useState(today)
   const [to, setTo] = useState(defaultTo)
 
-  // Ordine iniziale: ogni dipendente ha un turno sabato 1-7
-  // startingPos[emp] = numero turno (1-7)
   const [startingPos, setStartingPos] = useState(() => {
     const obj = {}
     EMPLOYEES.forEach((emp, i) => { obj[emp] = i + 1 })
     return obj
   })
 
+  // Indisponibilità manuali: [{ id, emp, from, to }]
+  const [indisponibilita, setIndisponibilita] = useState([])
+
   const [figureAssenze, setFigureAssenze] = useState({})
-  const [step, setStep] = useState('config') // 'config' | 'confirm'
+  const [step, setStep] = useState('config')
   const [preview, setPreview] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  // Carica le figure assenze nel range selezionato
+  const nicoleWarning = to > NICOLE_END
+
   useEffect(() => {
     if (!from || !to) return
     supabase.from('figure_assenze')
@@ -71,17 +69,35 @@ export default function GeneraTurniModal({ onClose, onApply }) {
   }
 
   function buildStartingOrder() {
-    // Array di 7 dipendenti ordinati per turno crescente
     return [...EMPLOYEES].sort((a, b) => startingPos[a] - startingPos[b])
+  }
+
+  function addIndisponibilita() {
+    setIndisponibilita(prev => [...prev, {
+      id: Date.now(),
+      emp: EMPLOYEES[0],
+      from: today,
+      to: today
+    }])
+  }
+
+  function updateIndisp(id, field, value) {
+    setIndisponibilita(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e))
+  }
+
+  function removeIndisp(id) {
+    setIndisponibilita(prev => prev.filter(e => e.id !== id))
   }
 
   function handlePreview() {
     if (hasDuplicates()) return
     const startingOrder = buildStartingOrder()
+    const eccezioni = indisponibilita.map(({ emp, from: f, to: t }) => ({ emp, from: f, to: t }))
     const records = generaTurni(
       new Date(from), new Date(to),
       startingOrder,
-      figureAssenze
+      figureAssenze,
+      eccezioni
     )
     setPreview(records)
     setStep('confirm')
@@ -90,25 +106,16 @@ export default function GeneraTurniModal({ onClose, onApply }) {
   async function handleConfirm() {
     if (!preview) return
     setSaving(true)
-
-    const toUpsert = preview
-      .filter(r => r.val)
-      .map(r => ({ chiave: r.key, valore: r.val }))
-
-    const { error } = await supabase
-      .from('turni')
-      .upsert(toUpsert, { onConflict: 'chiave' })
-
+    const toUpsert = preview.filter(r => r.val).map(r => ({ chiave: r.key, valore: r.val }))
+    const { error } = await supabase.from('turni').upsert(toUpsert, { onConflict: 'chiave' })
     setSaving(false)
     if (error) { alert('Errore salvataggio: ' + error.message); return }
-
     onApply(preview)
     onClose()
   }
 
   const duplicates = hasDuplicates()
 
-  // Conta assegnazioni per anteprima
   const previewStats = preview ? (() => {
     const byEmp = {}
     EMPLOYEES.forEach(e => { byEmp[e] = 0 })
@@ -129,6 +136,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
 
         {step === 'config' && (
           <>
+            {/* PERIODO */}
             <div className={styles.section}>
               <label className={styles.label}>Periodo da generare</label>
               <div className={styles.dateRow}>
@@ -142,41 +150,42 @@ export default function GeneraTurniModal({ onClose, onApply }) {
                 </div>
               </div>
               {from && to && (
-                <span className={styles.weekCount}>
-                  ~{countWeeks(from, to)} settimane · {fmt(from)} – {fmt(to)}
-                </span>
+                <span className={styles.weekCount}>~{countWeeks(from, to)} settimane · {fmt(from)} – {fmt(to)}</span>
+              )}
+              {nicoleWarning && (
+                <div className={styles.infoBox}>
+                  Il periodo supera il 30/09/2026 — <strong>Nicole Cavalli</strong> verrà esclusa automaticamente dal 01/10/2026 in poi.
+                </div>
               )}
             </div>
 
+            {/* ROTAZIONE INIZIALE */}
             <div className={styles.section}>
               <label className={styles.label}>
                 Turno sabato iniziale
-                <span className={styles.labelHint}>— assegna a ciascun dipendente il turno del primo sabato nel periodo</span>
+                <span className={styles.labelHint}>— turno di ciascun dipendente nel primo sabato del periodo</span>
               </label>
-
               {duplicates && (
-                <div className={styles.warning}>Attenzione: ci sono turni duplicati. Ogni dipendente deve avere un turno diverso (1–7).</div>
+                <div className={styles.warning}>Turni duplicati: ogni dipendente deve avere un turno diverso (1–7).</div>
               )}
-
               <div className={styles.rotTable}>
                 <div className={styles.rotHeader}>
                   <span>Dipendente</span>
-                  <span>Turno sabato</span>
-                  <span>Turno domenica</span>
+                  <span>Sab</span>
+                  <span>Dom</span>
                   <span>Note</span>
                 </div>
                 {EMPLOYEES.map(emp => {
                   const satT = startingPos[emp]
-                  const sunT = 7 - satT // con max=6 standard; varia se figura assente
+                  const sunT = 7 - satT
                   const isLast = satT === 6 || satT === 7
                   const isThird = satT === 3
                   return (
                     <div key={emp} className={styles.rotRow}>
                       <span className={styles.empName}>{emp}</span>
                       <input
-                        type="number"
-                        min={1} max={7}
-                        className={`${styles.posInput} ${hasDuplicates() ? styles.posInputErr : ''}`}
+                        type="number" min={1} max={7}
+                        className={`${styles.posInput} ${duplicates ? styles.posInputErr : ''}`}
                         value={satT}
                         onChange={e => setPos(emp, e.target.value)}
                       />
@@ -184,12 +193,9 @@ export default function GeneraTurniModal({ onClose, onApply }) {
                       <span className={styles.noteTag}>
                         {emp === 'Francesca Novello'
                           ? <span className={styles.tagBlue}>Mar/Mer/Ven fissi</span>
-                          : isLast
-                            ? <span className={styles.tagGreen}>Viene giovedì</span>
-                            : isThird
-                              ? <span className={styles.tagOrange}>Viene venerdì</span>
-                              : null
-                        }
+                          : isLast ? <span className={styles.tagGreen}>Viene giovedì</span>
+                          : isThird ? <span className={styles.tagOrange}>Viene venerdì</span>
+                          : null}
                       </span>
                     </div>
                   )
@@ -197,9 +203,35 @@ export default function GeneraTurniModal({ onClose, onApply }) {
               </div>
             </div>
 
-            <div className={styles.infoBox}>
+            {/* INDISPONIBILITÀ */}
+            <div className={styles.section}>
+              <div className={styles.indispHeader}>
+                <label className={styles.label}>Indisponibilità</label>
+                <button className={styles.addBtn} onClick={addIndisponibilita}>+ Aggiungi</button>
+              </div>
+              {indisponibilita.length === 0 && (
+                <span className={styles.emptyHint}>Nessuna — aggiungi se un dipendente non può lavorare in un certo periodo.</span>
+              )}
+              {indisponibilita.map(entry => (
+                <div key={entry.id} className={styles.indispRow}>
+                  <select
+                    className={styles.indispSelect}
+                    value={entry.emp}
+                    onChange={e => updateIndisp(entry.id, 'emp', e.target.value)}
+                  >
+                    {EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                  </select>
+                  <span className={styles.indispLabel}>dal</span>
+                  <input type="date" className={styles.indispDate} value={entry.from} onChange={e => updateIndisp(entry.id, 'from', e.target.value)} />
+                  <span className={styles.indispLabel}>al</span>
+                  <input type="date" className={styles.indispDate} value={entry.to} onChange={e => updateIndisp(entry.id, 'to', e.target.value)} />
+                  <button className={styles.removeBtn} onClick={() => removeIndisp(entry.id)}>✕</button>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.infoBoxBottom}>
               Le assenze delle figure nascoste vengono lette automaticamente dalla tab "Figure".
-              Settimane con almeno una figura assente avranno turno massimo 7 (nessuno a riposo).
             </div>
 
             <button
@@ -225,13 +257,17 @@ export default function GeneraTurniModal({ onClose, onApply }) {
                 ))}
               </div>
               <div className={styles.previewTotal}>
-                Totale: <strong>{preview.length} celle</strong> da scrivere nel periodo {fmt(from)} – {fmt(to)}
+                Totale: <strong>{preview.length} celle</strong> · {fmt(from)} – {fmt(to)}
               </div>
+              {indisponibilita.length > 0 && (
+                <div className={styles.indispSummary}>
+                  Indisponibilità applicate: {indisponibilita.map(e => `${e.emp.split(' ')[0]} (${fmt(e.from)}–${fmt(e.to)})`).join(', ')}
+                </div>
+              )}
               <div className={styles.warning}>
                 Le celle già compilate nel database verranno sovrascritte.
               </div>
             </div>
-
             <div className={styles.btnRow}>
               <button className={styles.secondaryBtn} onClick={() => setStep('config')}>← Modifica</button>
               <button className={styles.confirmBtn} onClick={handleConfirm} disabled={saving}>

@@ -290,3 +290,89 @@
 }
 .confirmBtn:hover:not(:disabled) { background: #1e8449; }
 .confirmBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.indispHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.addBtn {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #4a90d9;
+  color: #4a90d9;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.addBtn:hover { background: #e8f4fd; }
+
+.emptyHint {
+  font-size: 11px;
+  color: #aaa;
+  font-style: italic;
+}
+
+.indispRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 5px;
+}
+
+.indispSelect {
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #333;
+  flex: 1;
+  min-width: 160px;
+}
+
+.indispLabel {
+  font-size: 11px;
+  color: #888;
+}
+
+.indispDate {
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #333;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.removeBtn:hover { color: #c0392b; background: #fef2f2; }
+
+.infoBoxBottom {
+  margin: 0 20px 4px;
+  padding: 8px 12px;
+  background: #f0f7ff;
+  border: 1px solid #bee3f8;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #2c5282;
+}
+
+.indispSummary {
+  font-size: 11px;
+  color: #666;
+  padding: 4px 0;
+  font-style: italic;
+}
