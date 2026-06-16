@@ -122,8 +122,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
     setSaving(false)
     if (results.some(r => r.error)) { alert('Errore salvataggio'); return }
 
-    onApply(toUpsert)
-    onClose()
+    onApply()
   }
 
   const duplicates = hasDuplicates()

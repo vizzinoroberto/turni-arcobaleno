@@ -377,13 +377,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       {showGenera && (
         <GeneraTurniModal
           onClose={() => setShowGenera(false)}
-          onApply={records => {
-            setData(prev => {
-              const next = { ...prev }
-              records.forEach(({ key, val }) => { if (val) next[key] = val })
-              return next
-            })
-          }}
+          onApply={() => { setShowGenera(false); loadData() }}
         />
       )}
     </div>
