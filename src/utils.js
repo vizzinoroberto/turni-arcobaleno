@@ -1,4 +1,20 @@
 export const PASSWORD_ADMIN = 'Arco2026'
+
+export const FESTIVI = new Set([
+  '01-01','01-06','04-25','05-01','06-02',
+  '08-15','11-01','12-08','12-24','12-25','12-26','12-31'
+])
+
+export function isFestivo(d) {
+  const mm = String(d.getMonth()+1).padStart(2,'0')
+  const dd = String(d.getDate()).padStart(2,'0')
+  return FESTIVI.has(`${mm}-${dd}`)
+}
+
+export function isSummer(d) {
+  const m = d.getMonth() + 1 // 1-12
+  return m >= 6 && m <= 9
+}
 export const PASSWORD_STAFF = 'arcoturni'
 
 export const EMPLOYEES = [

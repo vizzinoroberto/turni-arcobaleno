@@ -9,9 +9,10 @@ import ExportModal from './ExportModal.jsx'
 import FerieModal from './FerieModal.jsx'
 import RichiestaCambioModal from './RichiestaCambioModal.jsx'
 import RichiesteAdmin from './RichiesteAdmin.jsx'
+import FigureTab from './FigureTab.jsx'
+import GeneraTurniModal from './GeneraTurniModal.jsx'
 import styles from './TurniGrid.module.css'
-
-const FESTIVI = new Set(['04-25','05-01','06-02','08-15','11-01','12-08','12-24','12-25','12-26','12-31'])
+import { FESTIVI } from './utils'
 
 const EMP_COLORS = [
   { bg: '#DBEAFE', border: '#93C5FD' },
@@ -62,6 +63,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showExport, setShowExport] = useState(false)
   const [showFerie, setShowFerie] = useState(false)
   const [showCambio, setShowCambio] = useState(false)
+  const [showGenera, setShowGenera] = useState(false)
   const [richiestePending, setRichiestePending] = useState(0)
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
@@ -235,6 +237,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             <button className={`${styles.mainTab} ${tab==='richieste'?styles.mainTabActive:''}`} onClick={() => setTab('richieste')}>
               Richieste {richiestePending > 0 && <span className={styles.tabBadge}>{richiestePending}</span>}
             </button>
+            <button className={`${styles.mainTab} ${tab==='figure'?styles.mainTabActive:''}`} onClick={() => setTab('figure')}>Figure</button>
           </div>
         )}
 
@@ -265,6 +268,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       {tab === 'statistiche' && isAdmin && <Statistiche data={data} />}
 
       {tab === 'richieste' && isAdmin && <RichiesteAdmin onPendingCountChange={handlePendingCountChange} />}
+
+      {tab === 'figure' && isAdmin && <FigureTab />}
 
       {tab === 'turni' && (
         <>
@@ -322,6 +327,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
           </div>
 
           {isAdmin && mode === 'admin' && (
+            <div className={styles.exportBar} style={{marginTop: 0, marginBottom: 0}}>
+              <button className={styles.generaBtn} onClick={() => setShowGenera(true)}>⚡ Genera turni</button>
+            </div>
+          )}
+
+          {isAdmin && mode === 'admin' && (
             <div className={styles.noteBox}>
               <label className={styles.noteLabel}>📝 Note settimana {formatDateFull(days[0])} – {formatDateFull(days[6])}</label>
               <textarea
@@ -363,6 +374,18 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       {showExport && <ExportModal data={data} currentMonday={currentMonday} onClose={() => setShowExport(false)} />}
       {showFerie && <FerieModal currentMonday={currentMonday} onClose={() => setShowFerie(false)} onApply={applyFerie} />}
       {showCambio && <RichiestaCambioModal data={data} onClose={() => setShowCambio(false)} />}
+      {showGenera && (
+        <GeneraTurniModal
+          onClose={() => setShowGenera(false)}
+          onApply={records => {
+            setData(prev => {
+              const next = { ...prev }
+              records.forEach(({ key, val }) => { if (val) next[key] = val })
+              return next
+            })
+          }}
+        />
+      )}
     </div>
   )
 }

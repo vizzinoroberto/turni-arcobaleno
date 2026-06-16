@@ -337,3 +337,16 @@
   transition: background 0.15s;
 }
 .cambioBtn:hover { background: #357abd; }
+
+.generaBtn {
+  padding: 7px 18px;
+  font-size: 13px;
+  background: #6d28d9;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.generaBtn:hover { background: #5b21b6; }
