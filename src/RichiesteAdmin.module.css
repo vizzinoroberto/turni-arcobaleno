@@ -58,6 +58,7 @@
 
 .card.approvata { border-left-color: #27ae60; opacity: 0.85; }
 .card.rifiutata { border-left-color: #c0392b; opacity: 0.85; }
+.cardAssenza { border-left-color: #16a085; }
 
 .cardHeader {
   display: flex;

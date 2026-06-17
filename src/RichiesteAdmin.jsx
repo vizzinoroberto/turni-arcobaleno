@@ -23,6 +23,7 @@ function fmtRichiestaDate(iso) {
 
 export default function RichiesteAdmin({ onPendingCountChange }) {
   const [richieste, setRichieste] = useState([])
+  const [richiesteAssenza, setRichiesteAssenza] = useState([])
   const [loading, setLoading] = useState(true)
   const [showStorico, setShowStorico] = useState(false)
   const [actionLoading, setActionLoading] = useState(null)
@@ -31,17 +32,18 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
 
   const loadRichieste = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('richieste_cambio')
-      .select('*')
-      .order('data_richiesta', { ascending: false })
-    if (error) { setLoading(false); return }
-    const lista = data || []
-    setRichieste(lista)
+    const [{ data: dataCambio }, { data: dataAssenza }] = await Promise.all([
+      supabase.from('richieste_cambio').select('*').order('data_richiesta', { ascending: false }),
+      supabase.from('richieste_assenza').select('*').order('data_richiesta', { ascending: false }),
+    ])
+    const listaCambio = dataCambio || []
+    const listaAssenza = dataAssenza || []
+    setRichieste(listaCambio)
+    setRichiesteAssenza(listaAssenza)
     setLoading(false)
-    // Notifica al padre il numero di richieste in sospeso
     if (onPendingCountChange) {
-      const pending = lista.filter(r => r.stato === 'in_sospeso').length
+      const pending = listaCambio.filter(r => r.stato === 'in_sospeso').length
+                    + listaAssenza.filter(r => r.stato === 'in_sospeso').length
       onPendingCountChange(pending)
     }
   }, [onPendingCountChange])
@@ -50,6 +52,8 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
 
   const inSospeso = richieste.filter(r => r.stato === 'in_sospeso')
   const storico = richieste.filter(r => r.stato !== 'in_sospeso')
+  const inSospesoAssenza = richiesteAssenza.filter(r => r.stato === 'in_sospeso')
+  const storicoAssenza = richiesteAssenza.filter(r => r.stato !== 'in_sospeso')
 
   async function approva(r) {
     if (!confirm(`Approvare la richiesta di ${r.nome_richiedente}? I turni verranno modificati automaticamente.`)) return
@@ -127,6 +131,109 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
     await supabase.from('richieste_cambio').delete().eq('id', r.id)
     setActionLoading(null)
     loadRichieste()
+  }
+
+  async function approvaAssenza(r) {
+    if (!confirm(`Approvare la richiesta di assenza di ${r.nome_richiedente}?`)) return
+    setActionLoading(r.id)
+    await supabase.from('richieste_assenza').update({
+      stato: 'approvata',
+      data_gestione: new Date().toISOString()
+    }).eq('id', r.id)
+    setActionLoading(null)
+    loadRichieste()
+  }
+
+  async function rifiutaAssenza(r) {
+    const motivo = motivoRifiuto[r.id] || ''
+    setActionLoading(r.id)
+    await supabase.from('richieste_assenza').update({
+      stato: 'rifiutata',
+      motivo_rifiuto: motivo || null,
+      data_gestione: new Date().toISOString()
+    }).eq('id', r.id)
+    setActionLoading(null)
+    setShowMotivoFor(null)
+    loadRichieste()
+  }
+
+  async function eliminaAssenza(r) {
+    if (!confirm(`Eliminare definitivamente la richiesta di assenza di ${r.nome_richiedente}?`)) return
+    setActionLoading(r.id)
+    await supabase.from('richieste_assenza').delete().eq('id', r.id)
+    setActionLoading(null)
+    loadRichieste()
+  }
+
+  function renderCardAssenza(r, isStorico = false) {
+    const isLoading = actionLoading === r.id
+    const periodoLabel = r.data_inizio === r.data_fine
+      ? fmtDate(r.data_inizio)
+      : `${fmtDate(r.data_inizio)} → ${fmtDate(r.data_fine)}`
+    return (
+      <div key={r.id} className={`${styles.card} ${styles.cardAssenza} ${isStorico ? styles[r.stato] : ''}`}>
+        <div className={styles.cardHeader}>
+          <div>
+            <span className={styles.nome}>{r.nome_richiedente}</span>
+            <span className={styles.tipoBadge}>🏠 Assenza</span>
+          </div>
+          <span className={styles.dataRichiesta}>{fmtRichiestaDate(r.data_richiesta)}</span>
+        </div>
+
+        <div className={styles.scambioBlock}>
+          <div className={styles.scambioRow}>
+            <span className={styles.scambioLabel}>Periodo:</span>
+            <span className={styles.scambioVal}>{periodoLabel}</span>
+          </div>
+        </div>
+
+        {r.note && (
+          <div className={styles.note}>
+            <span className={styles.noteLabel}>Note:</span> {r.note}
+          </div>
+        )}
+
+        {isStorico ? (
+          <div className={styles.statoBox}>
+            <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
+              {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
+            </span>
+            {r.motivo_rifiuto && <span className={styles.motivoText}>Motivo: {r.motivo_rifiuto}</span>}
+          </div>
+        ) : (
+          <>
+            {showMotivoFor === r.id && (
+              <div className={styles.motivoBox}>
+                <input
+                  type="text"
+                  className={styles.motivoInput}
+                  placeholder="Motivo rifiuto (opzionale)"
+                  value={motivoRifiuto[r.id] || ''}
+                  onChange={e => setMotivoRifiuto({...motivoRifiuto, [r.id]: e.target.value})}
+                />
+                <div className={styles.motivoBtns}>
+                  <button className={styles.btnAnnulla} onClick={() => setShowMotivoFor(null)}>Annulla</button>
+                  <button className={styles.btnRifiuta} onClick={() => rifiutaAssenza(r)} disabled={isLoading}>Conferma rifiuto</button>
+                </div>
+              </div>
+            )}
+            {showMotivoFor !== r.id && (
+              <div className={styles.actions}>
+                <button className={styles.btnApprova} onClick={() => approvaAssenza(r)} disabled={isLoading}>
+                  {isLoading ? 'Attendere...' : '✓ Approva'}
+                </button>
+                <button className={styles.btnRifiutaOpen} onClick={() => setShowMotivoFor(r.id)} disabled={isLoading}>
+                  ✗ Rifiuta
+                </button>
+                <button className={styles.btnElimina} onClick={() => eliminaAssenza(r)} disabled={isLoading}>
+                  Elimina
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    )
   }
 
   function renderCard(r, isStorico = false) {
@@ -214,33 +321,42 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
     )
   }
 
+  const totSospeso = inSospeso.length + inSospesoAssenza.length
+  const totStorico = storico.length + storicoAssenza.length
+
   return (
     <div className={styles.wrap}>
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <h3 className={styles.sectionTitle}>
-            🔔 In sospeso {inSospeso.length > 0 && <span className={styles.badge}>{inSospeso.length}</span>}
+            🔔 In sospeso {totSospeso > 0 && <span className={styles.badge}>{totSospeso}</span>}
           </h3>
           <button className={styles.refreshBtn} onClick={loadRichieste}>↻ Aggiorna</button>
         </div>
         {loading ? (
           <p className={styles.empty}>Caricamento...</p>
-        ) : inSospeso.length === 0 ? (
+        ) : totSospeso === 0 ? (
           <p className={styles.empty}>Nessuna richiesta in sospeso</p>
         ) : (
-          <div className={styles.list}>{inSospeso.map(r => renderCard(r))}</div>
+          <div className={styles.list}>
+            {inSospeso.map(r => renderCard(r))}
+            {inSospesoAssenza.map(r => renderCardAssenza(r))}
+          </div>
         )}
       </div>
 
       <div className={styles.section}>
         <button className={styles.storicoToggle} onClick={() => setShowStorico(!showStorico)}>
-          {showStorico ? '▼' : '▶'} Storico ({storico.length})
+          {showStorico ? '▼' : '▶'} Storico ({totStorico})
         </button>
         {showStorico && (
-          storico.length === 0 ? (
+          totStorico === 0 ? (
             <p className={styles.empty}>Nessuna richiesta nello storico</p>
           ) : (
-            <div className={styles.list}>{storico.map(r => renderCard(r, true))}</div>
+            <div className={styles.list}>
+              {storico.map(r => renderCard(r, true))}
+              {storicoAssenza.map(r => renderCardAssenza(r, true))}
+            </div>
           )
         )}
       </div>

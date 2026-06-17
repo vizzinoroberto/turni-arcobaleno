@@ -8,6 +8,7 @@ import Statistiche from './Statistiche.jsx'
 import ExportModal from './ExportModal.jsx'
 import FerieModal from './FerieModal.jsx'
 import RichiestaCambioModal from './RichiestaCambioModal.jsx'
+import RichiestaAssenzaModal from './RichiestaAssenzaModal.jsx'
 import RichiesteAdmin from './RichiesteAdmin.jsx'
 import FigureTab from './FigureTab.jsx'
 import GeneraTurniModal from './GeneraTurniModal.jsx'
@@ -63,6 +64,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showExport, setShowExport] = useState(false)
   const [showFerie, setShowFerie] = useState(false)
   const [showCambio, setShowCambio] = useState(false)
+  const [showAssenza, setShowAssenza] = useState(false)
   const [showGenera, setShowGenera] = useState(false)
   const [richiestePending, setRichiestePending] = useState(0)
   const saveTimer = useRef(null)
@@ -75,11 +77,11 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   // Funzione separata per caricare solo il conteggio richieste (anche al cambio tab)
   const loadRichiestePending = useCallback(async () => {
     if (!isAdmin) return
-    const { count } = await supabase
-      .from('richieste_cambio')
-      .select('id', { count: 'exact', head: true })
-      .eq('stato', 'in_sospeso')
-    setRichiestePending(count || 0)
+    const [{ count: countCambio }, { count: countAssenza }] = await Promise.all([
+      supabase.from('richieste_cambio').select('id', { count: 'exact', head: true }).eq('stato', 'in_sospeso'),
+      supabase.from('richieste_assenza').select('id', { count: 'exact', head: true }).eq('stato', 'in_sospeso'),
+    ])
+    setRichiestePending((countCambio || 0) + (countAssenza || 0))
   }, [isAdmin])
 
   const loadData = useCallback(async () => {
@@ -373,7 +375,10 @@ export default function TurniGrid({ isAdmin, onLogout }) {
               <button className={styles.ferieBtn} onClick={() => setShowFerie(true)}>🏖 Imposta FERIE</button>
             )}
             {!isAdmin && (
-              <button className={styles.cambioBtn} onClick={() => setShowCambio(true)}>🔄 Richiedi cambio turno</button>
+              <>
+                <button className={styles.cambioBtn} onClick={() => setShowCambio(true)}>🔄 Richiedi cambio turno</button>
+                <button className={styles.assenzaBtn} onClick={() => setShowAssenza(true)}>🏠 Richiedi periodo assenza</button>
+              </>
             )}
             <button className={styles.exportBtn} onClick={() => setShowExport(true)}>⬇ Scarica turni</button>
           </div>
@@ -383,6 +388,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       {showExport && <ExportModal data={data} currentMonday={currentMonday} onClose={() => setShowExport(false)} />}
       {showFerie && <FerieModal currentMonday={currentMonday} onClose={() => setShowFerie(false)} onApply={applyFerie} />}
       {showCambio && <RichiestaCambioModal data={data} onClose={() => setShowCambio(false)} />}
+      {showAssenza && <RichiestaAssenzaModal onClose={() => setShowAssenza(false)} />}
       {showGenera && (
         <GeneraTurniModal
           onClose={() => setShowGenera(false)}
