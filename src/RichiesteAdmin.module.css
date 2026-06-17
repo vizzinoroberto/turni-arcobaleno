@@ -229,3 +229,39 @@
   text-align: left;
 }
 .storicoToggle:hover { color: #222; }
+
+.storicoTabs {
+  display: flex;
+  border: 1px solid #ddd;
+  border-radius: 7px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+
+.storicoTab {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #f5f5f5;
+  color: #666;
+  border: none;
+  border-right: 1px solid #ddd;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.storicoTab:last-child { border-right: none; }
+.storicoTab:hover { background: #ebebeb; }
+.storicoTabActive { background: #fff; color: #222; font-weight: bold; }
+
+.tabCount {
+  background: #ddd;
+  color: #555;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: bold;
+}

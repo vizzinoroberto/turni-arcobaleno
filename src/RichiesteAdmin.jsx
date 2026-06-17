@@ -26,6 +26,7 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
   const [richiesteAssenza, setRichiesteAssenza] = useState([])
   const [loading, setLoading] = useState(true)
   const [showStorico, setShowStorico] = useState(false)
+  const [storicoTab, setStoricoTab] = useState('cambio')
   const [actionLoading, setActionLoading] = useState(null)
   const [motivoRifiuto, setMotivoRifiuto] = useState({})
   const [showMotivoFor, setShowMotivoFor] = useState(null)
@@ -350,14 +351,32 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
           {showStorico ? '▼' : '▶'} Storico ({totStorico})
         </button>
         {showStorico && (
-          totStorico === 0 ? (
-            <p className={styles.empty}>Nessuna richiesta nello storico</p>
-          ) : (
-            <div className={styles.list}>
-              {storico.map(r => renderCard(r, true))}
-              {storicoAssenza.map(r => renderCardAssenza(r, true))}
+          <>
+            <div className={styles.storicoTabs}>
+              <button
+                className={`${styles.storicoTab} ${storicoTab === 'cambio' ? styles.storicoTabActive : ''}`}
+                onClick={() => setStoricoTab('cambio')}
+              >
+                🔄 Cambio turno {storico.length > 0 && <span className={styles.tabCount}>{storico.length}</span>}
+              </button>
+              <button
+                className={`${styles.storicoTab} ${storicoTab === 'assenza' ? styles.storicoTabActive : ''}`}
+                onClick={() => setStoricoTab('assenza')}
+              >
+                🏠 Assenze {storicoAssenza.length > 0 && <span className={styles.tabCount}>{storicoAssenza.length}</span>}
+              </button>
             </div>
-          )
+            {storicoTab === 'cambio' && (
+              storico.length === 0
+                ? <p className={styles.empty}>Nessuna richiesta cambio turno nello storico</p>
+                : <div className={styles.list}>{storico.map(r => renderCard(r, true))}</div>
+            )}
+            {storicoTab === 'assenza' && (
+              storicoAssenza.length === 0
+                ? <p className={styles.empty}>Nessuna richiesta assenza nello storico</p>
+                : <div className={styles.list}>{storicoAssenza.map(r => renderCardAssenza(r, true))}</div>
+            )}
+          </>
         )}
       </div>
     </div>
