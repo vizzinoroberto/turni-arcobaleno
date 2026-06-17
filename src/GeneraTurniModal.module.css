@@ -1,0 +1,378 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #222;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.closeBtn:hover { background: #f0f0f0; color: #333; }
+
+.section {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+}
+
+.labelHint {
+  font-size: 11px;
+  font-weight: normal;
+  color: #888;
+  margin-left: 6px;
+}
+
+.dateRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dateField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dateLabel {
+  font-size: 12px;
+  color: #666;
+  min-width: 24px;
+}
+
+.dateInput {
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 13px;
+  color: #333;
+}
+
+.weekCount {
+  font-size: 11px;
+  color: #888;
+}
+
+.warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #856404;
+}
+
+.rotTable {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rotHeader {
+  display: grid;
+  grid-template-columns: 1fr 80px 80px 1fr;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #888;
+  background: #f8f8f8;
+  border-radius: 5px;
+}
+
+.rotRow {
+  display: grid;
+  grid-template-columns: 1fr 80px 80px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  border: 1px solid #eee;
+  border-radius: 5px;
+  background: #fafafa;
+}
+
+.empName {
+  font-size: 12px;
+  color: #333;
+  font-weight: 500;
+}
+
+.posInput {
+  width: 60px;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 13px;
+  text-align: center;
+  color: #333;
+}
+.posInput:focus { outline: none; border-color: #4a90d9; }
+.posInputErr { border-color: #e74c3c; background: #fef2f2; }
+
+.sunTurno {
+  font-size: 12px;
+  color: #888;
+  text-align: center;
+}
+
+.noteTag {
+  display: flex;
+  align-items: center;
+}
+
+.tagBlue {
+  font-size: 10px;
+  background: #e8f4fd;
+  color: #2c5282;
+  border: 1px solid #bee3f8;
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.tagGreen {
+  font-size: 10px;
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.tagOrange {
+  font-size: 10px;
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.infoBox {
+  margin: 0 20px;
+  padding: 10px 14px;
+  background: #f0f7ff;
+  border: 1px solid #bee3f8;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #2c5282;
+  line-height: 1.5;
+}
+
+.primaryBtn {
+  margin: 16px 20px;
+  padding: 10px 24px;
+  background: #222;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  align-self: flex-end;
+}
+.primaryBtn:hover:not(:disabled) { background: #444; }
+.primaryBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.previewGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.previewRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 5px;
+}
+
+.previewEmp {
+  font-size: 12px;
+  color: #333;
+}
+
+.previewCount {
+  font-size: 12px;
+  color: #888;
+  font-weight: 500;
+}
+
+.previewTotal {
+  font-size: 12px;
+  color: #555;
+  padding: 4px 0;
+}
+
+.btnRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+.secondaryBtn {
+  padding: 9px 18px;
+  background: #fff;
+  color: #555;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.secondaryBtn:hover { background: #f5f5f5; }
+
+.confirmBtn {
+  padding: 9px 24px;
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.confirmBtn:hover:not(:disabled) { background: #1e8449; }
+.confirmBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.indispHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.addBtn {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #4a90d9;
+  color: #4a90d9;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.addBtn:hover { background: #e8f4fd; }
+
+.emptyHint {
+  font-size: 11px;
+  color: #aaa;
+  font-style: italic;
+}
+
+.indispRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 5px;
+}
+
+.indispSelect {
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #333;
+  flex: 1;
+  min-width: 160px;
+}
+
+.indispLabel {
+  font-size: 11px;
+  color: #888;
+}
+
+.indispDate {
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #333;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.removeBtn:hover { color: #c0392b; background: #fef2f2; }
+
+.infoBoxBottom {
+  margin: 0 20px 4px;
+  padding: 8px 12px;
+  background: #f0f7ff;
+  border: 1px solid #bee3f8;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #2c5282;
+}
+
+.indispSummary {
+  font-size: 11px;
+  color: #666;
+  padding: 4px 0;
+  font-style: italic;
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 import {
-  EMPLOYEES, DOW_LABELS, getMonday, addDays, toDateStr,
+  EMPLOYEES, EMPLOYEE_PERIODS, DOW_LABELS, getMonday, addDays, toDateStr,
   formatDateVertical, isWeekend, isSunday, getWeekDays, shiftToDisplay
 } from './utils'
 import Statistiche from './Statistiche.jsx'
@@ -9,9 +9,10 @@ import ExportModal from './ExportModal.jsx'
 import FerieModal from './FerieModal.jsx'
 import RichiestaCambioModal from './RichiestaCambioModal.jsx'
 import RichiesteAdmin from './RichiesteAdmin.jsx'
+import FigureTab from './FigureTab.jsx'
+import GeneraTurniModal from './GeneraTurniModal.jsx'
 import styles from './TurniGrid.module.css'
-
-const FESTIVI = new Set(['04-25','05-01','06-02','08-15','11-01','12-08','12-24','12-25','12-26','12-31'])
+import { FESTIVI } from './utils'
 
 const EMP_COLORS = [
   { bg: '#DBEAFE', border: '#93C5FD' },
@@ -62,6 +63,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showExport, setShowExport] = useState(false)
   const [showFerie, setShowFerie] = useState(false)
   const [showCambio, setShowCambio] = useState(false)
+  const [showGenera, setShowGenera] = useState(false)
   const [richiestePending, setRichiestePending] = useState(0)
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
@@ -223,6 +225,15 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const currentNote = notes[weekKey] || ''
   const isStaffView = mode === 'staff'
 
+  // Filtra dipendenti attivi per la settimana visualizzata (usa il lunedì come riferimento)
+  const visibleEmployees = EMPLOYEES.filter(emp => {
+    const period = EMPLOYEE_PERIODS[emp]
+    if (!period) return true
+    if (period.to && toDateStr(currentMonday) > period.to) return false
+    if (period.from && toDateStr(addDays(currentMonday, 6)) < period.from) return false
+    return true
+  })
+
   return (
     <div className={styles.app}>
       <div className={styles.topBar}>
@@ -235,6 +246,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             <button className={`${styles.mainTab} ${tab==='richieste'?styles.mainTabActive:''}`} onClick={() => setTab('richieste')}>
               Richieste {richiestePending > 0 && <span className={styles.tabBadge}>{richiestePending}</span>}
             </button>
+            <button className={`${styles.mainTab} ${tab==='figure'?styles.mainTabActive:''}`} onClick={() => setTab('figure')}>Figure</button>
           </div>
         )}
 
@@ -266,6 +278,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
       {tab === 'richieste' && isAdmin && <RichiesteAdmin onPendingCountChange={handlePendingCountChange} />}
 
+      {tab === 'figure' && isAdmin && <FigureTab />}
+
       {tab === 'turni' && (
         <>
           <div className={styles.tableWrap}>
@@ -285,7 +299,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                 </tr>
               </thead>
               <tbody>
-                {EMPLOYEES.map((emp, ei) =>
+                {visibleEmployees.map((emp, ei) =>
                   ['pranzo','cena'].map((service, si) => (
                     <tr key={`${emp}-${service}`} className={si===0?styles.rowPranzo:styles.rowCena}>
                       {si===0 && (
@@ -320,6 +334,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
               </tbody>
             </table>
           </div>
+
+          {isAdmin && mode === 'admin' && (
+            <div className={styles.exportBar} style={{marginTop: 0, marginBottom: 0}}>
+              <button className={styles.generaBtn} onClick={() => setShowGenera(true)}>⚡ Genera turni</button>
+            </div>
+          )}
 
           {isAdmin && mode === 'admin' && (
             <div className={styles.noteBox}>
@@ -363,6 +383,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       {showExport && <ExportModal data={data} currentMonday={currentMonday} onClose={() => setShowExport(false)} />}
       {showFerie && <FerieModal currentMonday={currentMonday} onClose={() => setShowFerie(false)} onApply={applyFerie} />}
       {showCambio && <RichiestaCambioModal data={data} onClose={() => setShowCambio(false)} />}
+      {showGenera && (
+        <GeneraTurniModal
+          onClose={() => setShowGenera(false)}
+          onApply={() => { setShowGenera(false); loadData() }}
+        />
+      )}
     </div>
   )
 }
