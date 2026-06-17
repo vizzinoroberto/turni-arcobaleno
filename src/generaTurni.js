@@ -2,11 +2,26 @@ import { EMPLOYEES, getMonday, addDays, toDateStr, getWeekDays, isFestivo, isSum
 
 const FRANCESCA = 'Francesca Novello'
 
+// Controllo per-giorno (usato per mar/mer/gio/ven/dom)
 function isEmpExcluded(emp, dateStr, eccezioni) {
   const period = EMPLOYEE_PERIODS[emp]
   if (period?.to && dateStr > period.to) return true
   if (period?.from && dateStr < period.from) return true
   return eccezioni.some(e => e.emp === emp && dateStr >= e.from && dateStr <= e.to)
+}
+
+// Controllo per la rotazione weekend: esclude chi ha un'eccezione che copre
+// sabato O domenica (se manca la domenica, non deve lavorare neanche il sabato)
+function isEmpExcludedWeekend(emp, satStr, sunStr, eccezioni) {
+  const period = EMPLOYEE_PERIODS[emp]
+  if (period?.to && satStr > period.to) return true
+  if (period?.from && satStr < period.from) return true
+  return eccezioni.some(e =>
+    e.emp === emp && (
+      (satStr >= e.from && satStr <= e.to) ||
+      (sunStr >= e.from && sunStr <= e.to)
+    )
+  )
 }
 
 // Cerca il dipendente con turnoTarget, scendendo se è Francesca o a riposo.
@@ -33,19 +48,24 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
     const weekStr = toDateStr(monday)
     const days = getWeekDays(monday)
     const satStr = toDateStr(days[5])
+    const sundayStr = toDateStr(days[6])
 
     // Rotazione settimanale basata sul sabato
     const headIdx = weekOffset % startingOrder.length
     const rotatedFull = [...startingOrder.slice(headIdx), ...startingOrder.slice(0, headIdx)]
-    const rotated = rotatedFull.filter(emp => !isEmpExcluded(emp, satStr, eccezioni))
+    const rotated = rotatedFull.filter(emp => !isEmpExcludedWeekend(emp, satStr, sundayStr, eccezioni))
 
     const n = rotated.length
     if (n === 0) { monday = addDays(monday, 7); weekOffset++; continue }
 
     const figureAssenti = figureAssenzePerSettimana[weekStr] || []
-    // Figura assente → tutti i dipendenti lavorano (maxTurno = n)
-    // Nessuna figura assente → 1 a riposo (maxTurno = n - 1)
-    const maxTurno = figureAssenti.length > 0 ? n : Math.max(n - 1, 1)
+    const hasWeekendAbsence = eccezioni.some(e =>
+      (satStr >= e.from && satStr <= e.to) ||
+      (sundayStr >= e.from && sundayStr <= e.to)
+    )
+    // Figura assente o indisponibilità weekend → tutti i presenti lavorano (maxTurno = n)
+    // Nessuna assenza → 1 a riposo (maxTurno = n - 1)
+    const maxTurno = (figureAssenti.length > 0 || hasWeekendAbsence) ? n : Math.max(n - 1, 1)
 
     const satTurno = {}
     rotated.forEach((emp, i) => {
@@ -115,7 +135,9 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
     })
 
     monday = addDays(monday, 7)
-    weekOffset++
+    // Se nessuno ha riposato naturalmente (assenza coatta o figura assente),
+    // non avanzare la rotazione: la settimana dopo riparte da dove si era rimasti.
+    if (!hasWeekendAbsence && figureAssenti.length === 0) weekOffset++
   }
 
   return { toUpsert, toDelete }
