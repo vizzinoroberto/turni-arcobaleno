@@ -110,7 +110,7 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
         // Martedì–Venerdì (+ festivi non lun/sab/dom)
         if (dow === 2 && summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
         if (dow === 3 && summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
-        if (dow === 4 && thurEmp && !excl(thurEmp))  cena[thurEmp] = '5'
+        if (dow === 4 && summer && thurEmp && !excl(thurEmp))  cena[thurEmp] = '5'
         if (dow === 5) {
           if (summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
           if (friEmp && !excl(friEmp))    cena[friEmp] = '4'
