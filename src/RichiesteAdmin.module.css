@@ -265,3 +265,106 @@
   font-size: 11px;
   font-weight: bold;
 }
+
+/* Richieste verbali */
+.cardVerbale { border-left-color: #8e44ad; }
+.verbaleGestita { opacity: 0.65; border-left-color: #27ae60; }
+
+.addVerbaleBtn {
+  padding: 5px 12px;
+  font-size: 12px;
+  border: 1px solid #8e44ad;
+  border-radius: 5px;
+  background: #fff;
+  color: #8e44ad;
+  cursor: pointer;
+  font-weight: bold;
+}
+.addVerbaleBtn:hover { background: #f5eeff; }
+
+.formVerbale {
+  background: #f9f5ff;
+  border: 1px solid #d4b8f0;
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.formRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.formSelect {
+  padding: 7px 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  flex: 1;
+  min-width: 120px;
+}
+
+.formDate {
+  padding: 7px 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.formNote {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+
+.btnSalvaVerbale {
+  padding: 8px 20px;
+  background: #8e44ad;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  align-self: flex-end;
+}
+.btnSalvaVerbale:hover:not(:disabled) { background: #6c3483; }
+.btnSalvaVerbale:disabled { background: #ccc; cursor: not-allowed; }
+
+.btnGestita {
+  padding: 8px 16px;
+  background: #27ae60;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  flex: 1;
+  min-width: 140px;
+}
+.btnGestita:hover { background: #1e8449; }
+
+.btnDaGestire {
+  padding: 8px 16px;
+  background: #fff;
+  color: #555;
+  border: 1px solid #aaa;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 80px;
+}
+.btnDaGestire:hover { background: #f5f5f5; }

@@ -66,6 +66,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showCambio, setShowCambio] = useState(false)
   const [showAssenza, setShowAssenza] = useState(false)
   const [showGenera, setShowGenera] = useState(false)
+  const [cutoffConfig, setCutoffConfig] = useState({ data: '', messaggio: '' })
   const [richiestePending, setRichiestePending] = useState(0)
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
@@ -93,8 +94,14 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     const results = await Promise.all(ops)
     if (results[0].error || results[1].error) { setSyncStatus({ msg: 'Errore caricamento ✗', cls: styles.err }); return }
     const obj = {}
-    results[0].data.forEach(r => { obj[r.chiave] = r.valore })
+    const cfg = { data: '', messaggio: '' }
+    results[0].data.forEach(r => {
+      if (r.chiave === '__config__::data') cfg.data = r.valore
+      else if (r.chiave === '__config__::messaggio') cfg.messaggio = r.valore
+      else obj[r.chiave] = r.valore
+    })
     setData(obj)
+    setCutoffConfig(cfg)
     const noteObj = {}
     results[1].data.forEach(r => { noteObj[r.settimana] = r.testo })
     setNotes(noteObj)
@@ -163,6 +170,22 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     setSyncStatus({ msg: 'Salvato ✓', cls: styles.ok })
   }
 
+  async function saveCutoffConfig() {
+    const ops = []
+    if (cutoffConfig.data) {
+      ops.push(supabase.from('turni').upsert({ chiave: '__config__::data', valore: cutoffConfig.data }, { onConflict: 'chiave' }))
+    } else {
+      ops.push(supabase.from('turni').delete().eq('chiave', '__config__::data'))
+    }
+    if (cutoffConfig.messaggio) {
+      ops.push(supabase.from('turni').upsert({ chiave: '__config__::messaggio', valore: cutoffConfig.messaggio }, { onConflict: 'chiave' }))
+    } else {
+      ops.push(supabase.from('turni').delete().eq('chiave', '__config__::messaggio'))
+    }
+    await Promise.all(ops)
+    setSyncStatus({ msg: 'Impostazioni salvate ✓', cls: styles.ok })
+  }
+
   function handleNoteChange(val) {
     setNotes(prev => ({ ...prev, [weekKey]: val }))
     clearTimeout(noteSaveTimer.current)
@@ -191,7 +214,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       supabase.from('turni').select('chiave, valore').then(({ data: rows }) => {
         if (rows) {
           const obj = {}
-          rows.forEach(r => { obj[r.chiave] = r.valore })
+          rows.forEach(r => { if (!r.chiave.startsWith('__config__::')) obj[r.chiave] = r.valore })
           setData(obj)
         }
       })
@@ -226,6 +249,16 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
   const currentNote = notes[weekKey] || ''
   const isStaffView = mode === 'staff'
+
+  function fmtConfigDate(str) {
+    if (!str) return ''
+    const [y, m, d] = str.split('-')
+    const months = ['gennaio','febbraio','marzo','aprile','maggio','giugno',
+                    'luglio','agosto','settembre','ottobre','novembre','dicembre']
+    return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`
+  }
+
+  const isWeekHidden = !isAdmin && !!cutoffConfig.data && toDateStr(currentMonday) > cutoffConfig.data
 
   // Filtra dipendenti attivi per la settimana visualizzata (usa il lunedì come riferimento)
   const visibleEmployees = EMPLOYEES.filter(emp => {
@@ -284,58 +317,77 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
       {tab === 'turni' && (
         <>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={`${styles.colName} ${styles.hdr}`} rowSpan={2}>Dipendente</th>
-                  {days.map((d,i) => (
-                    <th key={i} className={styles.dayHeader}>
-                      <span className={styles.dateVertical}>{formatDateVertical(d)}</span>
-                      <span className={`${styles.dow} ${isWeekend(d)?styles.weekend:''}`}>{DOW_LABELS[d.getDay()]}</span>
-                    </th>
-                  ))}
-                </tr>
-                <tr>
-                  {days.map((d,i) => <th key={i} className={styles.pcHeader}></th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {visibleEmployees.map((emp, ei) =>
-                  ['pranzo','cena'].map((service, si) => (
-                    <tr key={`${emp}-${service}`} className={si===0?styles.rowPranzo:styles.rowCena}>
-                      {si===0 && (
-                        <td
-                          className={styles.colName}
-                          rowSpan={2}
-                          style={{ backgroundColor: EMP_COLORS[ei].bg, borderLeft: `4px solid ${EMP_COLORS[ei].border}` }}
-                        >{emp}</td>
-                      )}
-                      {days.map((d, di) => {
-                        const key = `${emp}::${toDateStr(d)}::${service}`
-                        const val = data[key] || ''
-                        return (
-                          <td
-                            key={di}
-                            className={styles.cellPair}
-                            style={{ backgroundColor: cellBg(ei, d) }}
-                          >
-                            {mode === 'admin' ? (
-                              <select className={selectClass(val)} value={val} onChange={e => handleChange(key, e.target.value)}>
-                                {adminOptions(service, val)}
-                              </select>
-                            ) : (
-                              renderStaffCell(val, service, d)
-                            )}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))
+          {isWeekHidden && (
+            <div className={styles.wipCard}>
+              <div className={styles.wipIcon}>📅</div>
+              <p className={styles.wipTitle}>Calendario in preparazione</p>
+              <p className={styles.wipText}>
+                Il calendario per questa settimana è in fase di preparazione.
+                {cutoffConfig.messaggio && (
+                  <><br />Sarà disponibile entro il <strong>{fmtConfigDate(cutoffConfig.messaggio)}</strong>.</>
                 )}
-              </tbody>
-            </table>
-          </div>
+              </p>
+              <p className={styles.wipText}>Per comunicare eventuali assenze usa il form apposito:</p>
+              <button className={styles.assenzaBtn} onClick={() => setShowAssenza(true)}>
+                🏠 Richiedi periodo assenza
+              </button>
+            </div>
+          )}
+
+          {!isWeekHidden && (
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th className={`${styles.colName} ${styles.hdr}`} rowSpan={2}>Dipendente</th>
+                    {days.map((d,i) => (
+                      <th key={i} className={styles.dayHeader}>
+                        <span className={styles.dateVertical}>{formatDateVertical(d)}</span>
+                        <span className={`${styles.dow} ${isWeekend(d)?styles.weekend:''}`}>{DOW_LABELS[d.getDay()]}</span>
+                      </th>
+                    ))}
+                  </tr>
+                  <tr>
+                    {days.map((d,i) => <th key={i} className={styles.pcHeader}></th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleEmployees.map((emp, ei) =>
+                    ['pranzo','cena'].map((service, si) => (
+                      <tr key={`${emp}-${service}`} className={si===0?styles.rowPranzo:styles.rowCena}>
+                        {si===0 && (
+                          <td
+                            className={styles.colName}
+                            rowSpan={2}
+                            style={{ backgroundColor: EMP_COLORS[ei].bg, borderLeft: `4px solid ${EMP_COLORS[ei].border}` }}
+                          >{emp}</td>
+                        )}
+                        {days.map((d, di) => {
+                          const key = `${emp}::${toDateStr(d)}::${service}`
+                          const val = data[key] || ''
+                          return (
+                            <td
+                              key={di}
+                              className={styles.cellPair}
+                              style={{ backgroundColor: cellBg(ei, d) }}
+                            >
+                              {mode === 'admin' ? (
+                                <select className={selectClass(val)} value={val} onChange={e => handleChange(key, e.target.value)}>
+                                  {adminOptions(service, val)}
+                                </select>
+                              ) : (
+                                renderStaffCell(val, service, d)
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {isAdmin && mode === 'admin' && (
             <div className={styles.exportBar} style={{marginTop: 0, marginBottom: 0}}>
@@ -356,7 +408,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             </div>
           )}
 
-          {isStaffView && currentNote && (
+          {isStaffView && currentNote && !isWeekHidden && (
             <div className={styles.noteDisplay}>
               <span className={styles.noteDisplayLabel}>📝 Note della settimana</span>
               <p className={styles.noteDisplayText}>{currentNote}</p>
@@ -374,14 +426,49 @@ export default function TurniGrid({ isAdmin, onLogout }) {
             {isAdmin && mode === 'admin' && (
               <button className={styles.ferieBtn} onClick={() => setShowFerie(true)}>🏖 Imposta FERIE</button>
             )}
-            {!isAdmin && (
+            {!isAdmin && !isWeekHidden && (
               <>
                 <button className={styles.cambioBtn} onClick={() => setShowCambio(true)}>🔄 Richiedi cambio turno</button>
                 <button className={styles.assenzaBtn} onClick={() => setShowAssenza(true)}>🏠 Richiedi periodo assenza</button>
               </>
             )}
-            <button className={styles.exportBtn} onClick={() => setShowExport(true)}>⬇ Scarica turni</button>
+            {!isWeekHidden && (
+              <button className={styles.exportBtn} onClick={() => setShowExport(true)}>⬇ Scarica turni</button>
+            )}
           </div>
+
+          {isAdmin && mode === 'admin' && (
+            <div className={styles.cutoffBox}>
+              <span className={styles.cutoffTitle}>🔒 Visibilità calendario dipendenti</span>
+              <div className={styles.cutoffRow}>
+                <span className={styles.cutoffLabel}>Turni visibili fino al:</span>
+                <input
+                  type="date"
+                  className={styles.cutoffDate}
+                  value={cutoffConfig.data}
+                  onChange={e => setCutoffConfig(prev => ({ ...prev, data: e.target.value }))}
+                />
+                {cutoffConfig.data && (
+                  <button className={styles.cutoffClearBtn} onClick={() => setCutoffConfig(prev => ({ ...prev, data: '' }))}>
+                    ✕ Nessun limite
+                  </button>
+                )}
+              </div>
+              <div className={styles.cutoffRow}>
+                <span className={styles.cutoffLabel}>«Disponibile entro il» (nel messaggio ai dipendenti):</span>
+                <input
+                  type="date"
+                  className={styles.cutoffDate}
+                  value={cutoffConfig.messaggio}
+                  onChange={e => setCutoffConfig(prev => ({ ...prev, messaggio: e.target.value }))}
+                />
+                {cutoffConfig.messaggio && (
+                  <button className={styles.cutoffClearBtn} onClick={() => setCutoffConfig(prev => ({ ...prev, messaggio: '' }))}>✕</button>
+                )}
+              </div>
+              <button className={styles.cutoffSaveBtn} onClick={saveCutoffConfig}>Salva impostazioni visibilità</button>
+            </div>
+          )}
         </>
       )}
 

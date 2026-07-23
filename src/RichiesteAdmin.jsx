@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabase'
+import { EMPLOYEES } from './utils'
 import styles from './RichiesteAdmin.module.css'
 
 const DOW = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab']
@@ -9,6 +10,12 @@ function fmtDate(dateStr) {
   const [y,m,d] = dateStr.split('-').map(Number)
   const date = new Date(y, m-1, d, 12)
   return `${DOW[date.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${String(y).slice(2)}`
+}
+
+function tipoVerbaleLabel(tipo) {
+  if (tipo === 'cambio_turno') return '🔄 Cambio turno'
+  if (tipo === 'assenza') return '🏠 Assenza'
+  return '📝 Altro'
 }
 
 function fmtServizio(s) {
@@ -24,23 +31,29 @@ function fmtRichiestaDate(iso) {
 export default function RichiesteAdmin({ onPendingCountChange }) {
   const [richieste, setRichieste] = useState([])
   const [richiesteAssenza, setRichiesteAssenza] = useState([])
+  const [richiesteVerbali, setRichiesteVerbali] = useState([])
   const [loading, setLoading] = useState(true)
   const [showStorico, setShowStorico] = useState(false)
   const [storicoTab, setStoricoTab] = useState('cambio')
   const [actionLoading, setActionLoading] = useState(null)
   const [motivoRifiuto, setMotivoRifiuto] = useState({})
   const [showMotivoFor, setShowMotivoFor] = useState(null)
+  const [showFormVerbale, setShowFormVerbale] = useState(false)
+  const [newVerbale, setNewVerbale] = useState({ nome_dipendente: '', data: new Date().toISOString().slice(0,10), tipo: 'cambio_turno', note: '' })
+  const [verbaleLoading, setVerbaleLoading] = useState(false)
 
   const loadRichieste = useCallback(async () => {
     setLoading(true)
-    const [{ data: dataCambio }, { data: dataAssenza }] = await Promise.all([
+    const [{ data: dataCambio }, { data: dataAssenza }, { data: dataVerbali }] = await Promise.all([
       supabase.from('richieste_cambio').select('*').order('data_richiesta', { ascending: false }),
       supabase.from('richieste_assenza').select('*').order('data_richiesta', { ascending: false }),
+      supabase.from('richieste_verbali').select('*').order('created_at', { ascending: false }),
     ])
     const listaCambio = dataCambio || []
     const listaAssenza = dataAssenza || []
     setRichieste(listaCambio)
     setRichiesteAssenza(listaAssenza)
+    setRichiesteVerbali(dataVerbali || [])
     setLoading(false)
     if (onPendingCountChange) {
       const pending = listaCambio.filter(r => r.stato === 'in_sospeso').length
@@ -322,6 +335,38 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
     )
   }
 
+  async function aggiungiVerbale() {
+    if (!newVerbale.nome_dipendente || !newVerbale.data) return
+    setVerbaleLoading(true)
+    await supabase.from('richieste_verbali').insert({
+      nome_dipendente: newVerbale.nome_dipendente,
+      data: newVerbale.data,
+      tipo: newVerbale.tipo,
+      note: newVerbale.note || null,
+      stato: 'da_gestire',
+    })
+    setNewVerbale({ nome_dipendente: '', data: new Date().toISOString().slice(0,10), tipo: 'cambio_turno', note: '' })
+    setShowFormVerbale(false)
+    setVerbaleLoading(false)
+    loadRichieste()
+  }
+
+  async function toggleStatoVerbale(r) {
+    const nuovoStato = r.stato === 'da_gestire' ? 'gestita' : 'da_gestire'
+    await supabase.from('richieste_verbali').update({ stato: nuovoStato }).eq('id', r.id)
+    loadRichieste()
+  }
+
+  async function eliminaVerbale(r) {
+    if (!confirm(`Eliminare la richiesta verbale di ${r.nome_dipendente}?`)) return
+    await supabase.from('richieste_verbali').delete().eq('id', r.id)
+    loadRichieste()
+  }
+
+  const verbaliDaGestire = richiesteVerbali.filter(r => r.stato === 'da_gestire')
+  const verbaliGestite = richiesteVerbali.filter(r => r.stato === 'gestita')
+  const verbaliOrdinati = [...verbaliDaGestire, ...verbaliGestite]
+
   const totSospeso = inSospeso.length + inSospesoAssenza.length
   const totStorico = storico.length + storicoAssenza.length
 
@@ -342,6 +387,96 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
           <div className={styles.list}>
             {inSospeso.map(r => renderCard(r))}
             {inSospesoAssenza.map(r => renderCardAssenza(r))}
+          </div>
+        )}
+      </div>
+
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h3 className={styles.sectionTitle}>
+            📋 Richieste verbali
+            {verbaliDaGestire.length > 0 && <span className={styles.badge}>{verbaliDaGestire.length}</span>}
+          </h3>
+          <button className={styles.addVerbaleBtn} onClick={() => setShowFormVerbale(v => !v)}>
+            {showFormVerbale ? '✕ Annulla' : '+ Aggiungi'}
+          </button>
+        </div>
+
+        {showFormVerbale && (
+          <div className={styles.formVerbale}>
+            <div className={styles.formRow}>
+              <select
+                className={styles.formSelect}
+                value={newVerbale.nome_dipendente}
+                onChange={e => setNewVerbale(prev => ({ ...prev, nome_dipendente: e.target.value }))}
+              >
+                <option value="">Dipendente...</option>
+                {EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+              </select>
+              <input
+                type="date"
+                className={styles.formDate}
+                value={newVerbale.data}
+                onChange={e => setNewVerbale(prev => ({ ...prev, data: e.target.value }))}
+              />
+              <select
+                className={styles.formSelect}
+                value={newVerbale.tipo}
+                onChange={e => setNewVerbale(prev => ({ ...prev, tipo: e.target.value }))}
+              >
+                <option value="cambio_turno">Cambio turno</option>
+                <option value="assenza">Assenza</option>
+                <option value="altro">Altro</option>
+              </select>
+            </div>
+            <textarea
+              className={styles.formNote}
+              placeholder="Note (opzionale)..."
+              value={newVerbale.note}
+              onChange={e => setNewVerbale(prev => ({ ...prev, note: e.target.value }))}
+              rows={2}
+            />
+            <button
+              className={styles.btnSalvaVerbale}
+              onClick={aggiungiVerbale}
+              disabled={verbaleLoading || !newVerbale.nome_dipendente || !newVerbale.data}
+            >
+              {verbaleLoading ? 'Salvataggio...' : 'Salva richiesta'}
+            </button>
+          </div>
+        )}
+
+        {verbaliOrdinati.length === 0 ? (
+          <p className={styles.empty}>Nessuna richiesta verbale registrata</p>
+        ) : (
+          <div className={styles.list}>
+            {verbaliOrdinati.map(r => (
+              <div key={r.id} className={`${styles.card} ${styles.cardVerbale} ${r.stato === 'gestita' ? styles.verbaleGestita : ''}`}>
+                <div className={styles.cardHeader}>
+                  <div>
+                    <span className={styles.nome}>{r.nome_dipendente}</span>
+                    <span className={styles.tipoBadge}>{tipoVerbaleLabel(r.tipo)}</span>
+                  </div>
+                  <span className={styles.dataRichiesta}>{fmtDate(r.data)}</span>
+                </div>
+                {r.note && (
+                  <div className={styles.note}>
+                    <span className={styles.noteLabel}>Note:</span> {r.note}
+                  </div>
+                )}
+                <div className={styles.actions}>
+                  <button
+                    className={r.stato === 'da_gestire' ? styles.btnGestita : styles.btnDaGestire}
+                    onClick={() => toggleStatoVerbale(r)}
+                  >
+                    {r.stato === 'da_gestire' ? '✓ Segna come gestita' : '↩ Riapri'}
+                  </button>
+                  <button className={styles.btnElimina} onClick={() => eliminaVerbale(r)}>
+                    Elimina
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
