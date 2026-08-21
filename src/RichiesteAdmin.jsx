@@ -44,10 +44,26 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
 
   const loadRichieste = useCallback(async () => {
     setLoading(true)
+    // Queste tabelle crescono all'infinito e venivano caricate INTERE a ogni
+    // apertura del tab. Carichiamo sempre le richieste in sospeso (a qualsiasi
+    // data) più lo storico degli ultimi 6 mesi, con un tetto di sicurezza.
+    const since = new Date(); since.setMonth(since.getMonth() - 6)
+    const sinceStr = since.toISOString().slice(0, 10)
     const [{ data: dataCambio }, { data: dataAssenza }, { data: dataVerbali }] = await Promise.all([
-      supabase.from('richieste_cambio').select('*').order('data_richiesta', { ascending: false }),
-      supabase.from('richieste_assenza').select('*').order('data_richiesta', { ascending: false }),
-      supabase.from('richieste_verbali').select('*').order('created_at', { ascending: false }),
+      supabase.from('richieste_cambio')
+        .select('*')
+        .or(`stato.eq.in_sospeso,data_richiesta.gte.${sinceStr}`)
+        .order('data_richiesta', { ascending: false })
+        .limit(300),
+      supabase.from('richieste_assenza')
+        .select('*')
+        .or(`stato.eq.in_sospeso,data_richiesta.gte.${sinceStr}`)
+        .order('data_richiesta', { ascending: false })
+        .limit(300),
+      supabase.from('richieste_verbali')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(300),
     ])
     const listaCambio = dataCambio || []
     const listaAssenza = dataAssenza || []
@@ -209,9 +225,14 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
 
         {isStorico ? (
           <div className={styles.statoBox}>
-            <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
-              {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
-            </span>
+            <div className={styles.statoRow}>
+              <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
+                {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
+              </span>
+              <button className={styles.btnElimina} onClick={() => eliminaAssenza(r)} disabled={isLoading}>
+                {isLoading ? 'Attendere...' : 'Elimina'}
+              </button>
+            </div>
             {r.motivo_rifiuto && <span className={styles.motivoText}>Motivo: {r.motivo_rifiuto}</span>}
           </div>
         ) : (
@@ -293,9 +314,14 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
 
         {isStorico ? (
           <div className={styles.statoBox}>
-            <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
-              {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
-            </span>
+            <div className={styles.statoRow}>
+              <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
+                {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
+              </span>
+              <button className={styles.btnElimina} onClick={() => elimina(r)} disabled={isLoading}>
+                {isLoading ? 'Attendere...' : 'Elimina'}
+              </button>
+            </div>
             {r.motivo_rifiuto && <span className={styles.motivoText}>Motivo: {r.motivo_rifiuto}</span>}
           </div>
         ) : (

@@ -40,6 +40,14 @@ function formatDateFull(d) {
   return `${dd}/${mm}/${yy}`
 }
 
+const DOW_FULL = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato']
+
+function fmtHintDate(str) {
+  const [y, m, d] = str.split('-').map(Number)
+  const date = new Date(y, m - 1, d, 12)
+  return `${DOW_FULL[date.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${String(y).slice(2)}`
+}
+
 function darken(hex, amount) {
   const r = Math.max(0, parseInt(hex.slice(1,3),16) - amount)
   const g = Math.max(0, parseInt(hex.slice(3,5),16) - amount)
@@ -68,9 +76,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showGenera, setShowGenera] = useState(false)
   const [cutoffConfig, setCutoffConfig] = useState({ data: '', messaggio: '' })
   const [richiestePending, setRichiestePending] = useState(0)
+  const [assenze, setAssenze] = useState([])
+  const [openHint, setOpenHint] = useState(null)
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
   const pendingRef = useRef({})
+  const hintRef = useRef(null)
 
   const weekKey = toDateStr(currentMonday)
   const days = getWeekDays(currentMonday)
@@ -83,6 +94,19 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       supabase.from('richieste_assenza').select('id', { count: 'exact', head: true }).eq('stato', 'in_sospeso'),
     ])
     setRichiestePending((countCambio || 0) + (countAssenza || 0))
+  }, [isAdmin])
+
+  // Carica le richieste di assenza in sospeso/approvate, per mostrare un hint
+  // di fianco al nome del dipendente nelle settimane in cui ha chiesto un permesso.
+  const loadAssenze = useCallback(async () => {
+    if (!isAdmin) return
+    const { data } = await supabase
+      .from('richieste_assenza')
+      .select('id, nome_richiedente, data_inizio, data_fine, stato, note')
+      .in('stato', ['in_sospeso', 'approvata'])
+      .order('data_inizio', { ascending: true })
+      .limit(300)
+    setAssenze(data || [])
   }, [isAdmin])
 
   const loadData = useCallback(async () => {
@@ -107,7 +131,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     setNotes(noteObj)
     setSyncStatus({ msg: 'Sincronizzato ✓', cls: styles.ok })
     loadRichiestePending()
-  }, [loadRichiestePending])
+    loadAssenze()
+  }, [loadRichiestePending, loadAssenze])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -116,6 +141,13 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     window.addEventListener('beforeunload', fn)
     return () => window.removeEventListener('beforeunload', fn)
   }, [])
+
+  useEffect(() => {
+    if (!openHint) return
+    const fn = (e) => { if (hintRef.current && !hintRef.current.contains(e.target)) setOpenHint(null) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [openHint])
 
   async function flushPending() {
     const batch = { ...pendingRef.current }
@@ -219,6 +251,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
         }
       })
     }
+    loadAssenze()
   }
 
   function adminOptions(service, val) {
@@ -268,6 +301,15 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     if (period.from && toDateStr(addDays(currentMonday, 6)) < period.from) return false
     return true
   })
+
+  // Richieste di assenza (in sospeso o approvate) che si sovrappongono alla settimana visualizzata
+  const weekStartStr = toDateStr(currentMonday)
+  const weekEndStr = toDateStr(addDays(currentMonday, 6))
+  function assenzeForEmp(emp) {
+    return assenze.filter(a =>
+      a.nome_richiedente === emp && a.data_inizio <= weekEndStr && a.data_fine >= weekStartStr
+    )
+  }
 
   return (
     <div className={styles.app}>
@@ -353,14 +395,47 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                 </thead>
                 <tbody>
                   {visibleEmployees.map((emp, ei) =>
-                    ['pranzo','cena'].map((service, si) => (
+                    ['pranzo','cena'].map((service, si) => {
+                      const empAssenze = si === 0 && isAdmin ? assenzeForEmp(emp) : []
+                      return (
                       <tr key={`${emp}-${service}`} className={si===0?styles.rowPranzo:styles.rowCena}>
                         {si===0 && (
                           <td
                             className={styles.colName}
                             rowSpan={2}
                             style={{ backgroundColor: EMP_COLORS[ei].bg, borderLeft: `4px solid ${EMP_COLORS[ei].border}` }}
-                          >{emp}</td>
+                          >
+                            <div className={styles.nameWrap}>
+                              <span>{emp}</span>
+                              {empAssenze.length > 0 && (
+                                <span className={styles.hintWrap} ref={openHint === emp ? hintRef : null}>
+                                  <button
+                                    type="button"
+                                    className={`${styles.hintBadge} ${empAssenze.some(a => a.stato === 'approvata') ? styles.hintApprovata : styles.hintSospeso}`}
+                                    title="Richiesta assenza in questa settimana"
+                                    onClick={() => setOpenHint(openHint === emp ? null : emp)}
+                                  >🏖</button>
+                                  {openHint === emp && (
+                                    <div className={styles.hintPopover}>
+                                      {empAssenze.map(a => (
+                                        <div key={a.id} className={styles.hintPopoverItem}>
+                                          <div className={styles.hintPopoverPeriod}>
+                                            {a.data_inizio === a.data_fine
+                                              ? fmtHintDate(a.data_inizio)
+                                              : <>da {fmtHintDate(a.data_inizio)}<br/>a {fmtHintDate(a.data_fine)}</>}
+                                          </div>
+                                          <div className={a.stato === 'approvata' ? styles.hintPopoverApprovata : styles.hintPopoverSospeso}>
+                                            {a.stato === 'approvata' ? '✓ Approvata' : '🕓 In sospeso'}
+                                          </div>
+                                          {a.note && <div className={styles.hintPopoverNote}>{a.note}</div>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </td>
                         )}
                         {days.map((d, di) => {
                           const key = `${emp}::${toDateStr(d)}::${service}`
@@ -382,7 +457,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                           )
                         })}
                       </tr>
-                    ))
+                      )
+                    })
                   )}
                 </tbody>
               </table>
