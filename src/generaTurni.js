@@ -85,6 +85,20 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
     const pranzoQ = Object.entries(sunTurno).find(([, t]) => t === 1)?.[0]
     const pranzoW = Object.entries(sunTurno).find(([, t]) => t === 2)?.[0]
 
+    // Chi lavora il venerdì (friEmp) sta a casa il sabato e lavora la domenica:
+    // il suo turno del sabato viene tolto e chi aveva un turno successivo scala
+    // di uno, così non restano buchi nei turni 1-5. Si applica solo se restano
+    // almeno un turno attivo il sabato senza friEmp (maxTurno >= 2).
+    const friTurno = friEmp ? satTurno[friEmp] : null
+    const satEmps = friTurno && maxTurno >= 2
+      ? activeEmps.filter(emp => emp !== friEmp)
+      : activeEmps
+    const satTurnoSab = {}
+    satEmps.forEach(emp => {
+      const t = satTurno[emp]
+      satTurnoSab[emp] = friTurno && maxTurno >= 2 && t > friTurno ? t - 1 : t
+    })
+
     days.forEach(day => {
       if (day < fromDate || day > toDate) return
 
@@ -101,8 +115,8 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
       if (dow === 1 && !festivo) {
         // Lunedì chiuso: tutto cancellato (cena e pranzo rimangono undefined)
       } else if (dow === 6) {
-        // Sabato: attivi con il loro turno cena
-        activeEmps.forEach(emp => { if (!excl(emp)) cena[emp] = String(satTurno[emp]) })
+        // Sabato: attivi con il loro turno cena (friEmp escluso, vedi satEmps)
+        satEmps.forEach(emp => { if (!excl(emp)) cena[emp] = String(satTurnoSab[emp]) })
       } else if (dow === 0 || (dow === 1 && festivo)) {
         // Domenica o lunedì festivo: attivi con turno domenica
         activeEmps.forEach(emp => { if (!excl(emp)) cena[emp] = String(sunTurno[emp]) })
