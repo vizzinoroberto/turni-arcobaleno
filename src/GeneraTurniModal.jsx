@@ -33,6 +33,9 @@ export default function GeneraTurniModal({ onClose, onApply }) {
   // Indisponibilità manuali: [{ id, emp, from, to }]
   const [indisponibilita, setIndisponibilita] = useState([])
 
+  // Richieste di assenza già approvate, lette automaticamente da Supabase
+  const [assenzeApprovate, setAssenzeApprovate] = useState([])
+
   const [figureAssenze, setFigureAssenze] = useState({})
   const [step, setStep] = useState('config')
   const [preview, setPreview] = useState(null) // { toUpsert, toDelete }
@@ -58,6 +61,16 @@ export default function GeneraTurniModal({ onClose, onApply }) {
         })
         setFigureAssenze(obj)
       })
+  }, [from, to])
+
+  useEffect(() => {
+    if (!from || !to) return
+    supabase.from('richieste_assenza')
+      .select('nome_richiedente, data_inizio, data_fine, note')
+      .eq('stato', 'approvata')
+      .lte('data_inizio', to)
+      .gte('data_fine', from)
+      .then(({ data }) => setAssenzeApprovate(data || []))
   }, [from, to])
 
   function setPos(emp, val) {
@@ -95,7 +108,11 @@ export default function GeneraTurniModal({ onClose, onApply }) {
   function handlePreview() {
     if (hasDuplicates()) return
     const startingOrder = buildStartingOrder()
-    const eccezioni = indisponibilita.map(({ emp, from: f, to: t }) => ({ emp, from: f, to: t }))
+    const eccezioni = [
+      ...assenzeApprovate.map(({ nome_richiedente, data_inizio, data_fine }) =>
+        ({ emp: nome_richiedente, from: data_inizio, to: data_fine })),
+      ...indisponibilita.map(({ emp, from: f, to: t }) => ({ emp, from: f, to: t })),
+    ]
     const result = generaTurni(new Date(from), new Date(to), startingOrder, figureAssenze, eccezioni)
     setPreview(result)
     setStep('confirm')
@@ -214,10 +231,26 @@ export default function GeneraTurniModal({ onClose, onApply }) {
               </div>
             </div>
 
+            {/* ASSENZE APPROVATE (automatiche) */}
+            <div className={styles.section}>
+              <label className={styles.label}>
+                Assenze approvate
+                <span className={styles.labelHint}>— lette automaticamente dalle richieste già approvate</span>
+              </label>
+              {assenzeApprovate.length === 0 && (
+                <span className={styles.emptyHint}>Nessuna richiesta di assenza approvata nel periodo selezionato.</span>
+              )}
+              {assenzeApprovate.map((a, i) => (
+                <div key={i} className={styles.indispSummary}>
+                  {a.nome_richiedente} — {fmt(a.data_inizio)} → {fmt(a.data_fine)}{a.note ? ` (${a.note})` : ''}
+                </div>
+              ))}
+            </div>
+
             {/* INDISPONIBILITÀ */}
             <div className={styles.section}>
               <div className={styles.indispHeader}>
-                <label className={styles.label}>Indisponibilità</label>
+                <label className={styles.label}>Altre indisponibilità</label>
                 <button className={styles.addBtn} onClick={addIndisponibilita}>+ Aggiungi</button>
               </div>
               {indisponibilita.length === 0 && (
@@ -270,9 +303,14 @@ export default function GeneraTurniModal({ onClose, onApply }) {
               <div className={styles.previewTotal}>
                 <strong>{preview.toUpsert.length} celle scritte</strong> · <strong>{preview.toDelete.length} celle cancellate</strong> · {fmt(from)} – {fmt(to)}
               </div>
+              {assenzeApprovate.length > 0 && (
+                <div className={styles.indispSummary}>
+                  Assenze approvate applicate: {assenzeApprovate.map(a => `${a.nome_richiedente.split(' ')[0]} (${fmt(a.data_inizio)}–${fmt(a.data_fine)})`).join(', ')}
+                </div>
+              )}
               {indisponibilita.length > 0 && (
                 <div className={styles.indispSummary}>
-                  Indisponibilità applicate: {indisponibilita.map(e => `${e.emp.split(' ')[0]} (${fmt(e.from)}–${fmt(e.to)})`).join(', ')}
+                  Altre indisponibilità applicate: {indisponibilita.map(e => `${e.emp.split(' ')[0]} (${fmt(e.from)}–${fmt(e.to)})`).join(', ')}
                 </div>
               )}
               <div className={styles.warning}>
