@@ -238,11 +238,17 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   }
 
   // Quando viene approvata/rifiutata/eliminata una richiesta, ricarico anche i dati turni
-  // perché un'approvazione modifica il database
-  function handlePendingCountChange(newCount) {
+  // perché un'approvazione modifica il database.
+  // Deve restare stabile (useCallback + ref, non lo state `richiestePending` nelle deps):
+  // altrimenti la sua identità cambia a ogni render, il che rompe la memoizzazione di
+  // loadRichieste in RichiesteAdmin e fa ripartire il fetch a Supabase in loop infinito.
+  const richiestePendingRef = useRef(richiestePending)
+  richiestePendingRef.current = richiestePending
+  const handlePendingCountChange = useCallback((newCount) => {
+    const changed = newCount !== richiestePendingRef.current
     setRichiestePending(newCount)
     // Ricarica i turni se siamo in admin (potrebbero essere stati modificati da un'approvazione)
-    if (newCount !== richiestePending) {
+    if (changed) {
       supabase.from('turni').select('chiave, valore').then(({ data: rows }) => {
         if (rows) {
           const obj = {}
@@ -250,9 +256,9 @@ export default function TurniGrid({ isAdmin, onLogout }) {
           setData(obj)
         }
       })
+      loadAssenze()
     }
-    loadAssenze()
-  }
+  }, [loadAssenze])
 
   function adminOptions(service, val) {
     const opts = service === 'pranzo'
