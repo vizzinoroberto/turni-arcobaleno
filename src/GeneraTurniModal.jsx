@@ -45,20 +45,34 @@ export default function GeneraTurniModal({ onClose, onApply }) {
 
   useEffect(() => {
     if (!from || !to) return
-    // Usa i lunedì come riferimento, come fa la tab Figure
-    const fromMonday = toDateStr(getMonday(new Date(from)))
-    const toMonday = toDateStr(getMonday(new Date(to)))
+    // La rotazione weekend è settimanale, quindi ciò che conta è solo se una
+    // figura manca sabato o domenica: aggreghiamo le assenze per-giorno su quei
+    // due giorni di ogni settimana, ignorando le assenze infrasettimanali.
+    const fromMondayDate = getMonday(new Date(from))
+    const toMondayDate = getMonday(new Date(to))
+    const fromMonday = toDateStr(fromMondayDate)
+    const toSunday = toDateStr(addDays(toMondayDate, 6))
     supabase.from('figure_assenze')
-      .select('settimana, figura')
-      .gte('settimana', fromMonday)
-      .lte('settimana', toMonday)
+      .select('data, figura')
+      .gte('data', fromMonday)
+      .lte('data', toSunday)
       .then(({ data }) => {
         if (!data) return
-        const obj = {}
-        data.forEach(({ settimana, figura }) => {
-          if (!obj[settimana]) obj[settimana] = []
-          obj[settimana].push(figura)
+        const byDate = {}
+        data.forEach(({ data: giorno, figura }) => {
+          if (!byDate[giorno]) byDate[giorno] = []
+          byDate[giorno].push(figura)
         })
+        const obj = {}
+        let monday = fromMondayDate
+        while (monday <= toMondayDate) {
+          const weekStr = toDateStr(monday)
+          const satStr = toDateStr(addDays(monday, 5))
+          const sunStr = toDateStr(addDays(monday, 6))
+          const assenti = [...new Set([...(byDate[satStr] || []), ...(byDate[sunStr] || [])])]
+          if (assenti.length > 0) obj[weekStr] = assenti
+          monday = addDays(monday, 7)
+        }
         setFigureAssenze(obj)
       })
   }, [from, to])

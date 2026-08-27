@@ -78,6 +78,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [richiestePending, setRichiestePending] = useState(0)
   const [assenze, setAssenze] = useState([])
   const [openHint, setOpenHint] = useState(null)
+  const [figureAssentiWeek, setFigureAssentiWeek] = useState([])
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
   const pendingRef = useRef({})
@@ -108,6 +109,22 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       .limit(300)
     setAssenze(data || [])
   }, [isAdmin])
+
+  // Carica le figure (extra rispetto ai dipendenti) assenti sabato/domenica della
+  // settimana visualizzata, per avvisare chi scrive i turni a mano che quel
+  // weekend serve il turno 7 (nessuno riposa) invece del turno 6 abituale.
+  const loadFigureAssenti = useCallback(async () => {
+    if (!isAdmin) return
+    const satStr = toDateStr(addDays(currentMonday, 5))
+    const sunStr = toDateStr(addDays(currentMonday, 6))
+    const { data } = await supabase
+      .from('figure_assenze')
+      .select('figura')
+      .in('data', [satStr, sunStr])
+    setFigureAssentiWeek([...new Set((data || []).map(r => r.figura))])
+  }, [isAdmin, currentMonday])
+
+  useEffect(() => { loadFigureAssenti() }, [loadFigureAssenti])
 
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
@@ -368,6 +385,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
       {tab === 'turni' && (
         <>
+          {isAdmin && mode === 'admin' && figureAssentiWeek.length > 0 && (
+            <div className={styles.figureHint}>
+              ⚠️ Figura assente questo weekend: <strong>{figureAssentiWeek.join(', ')}</strong> → turno 7 attivo, nessun dipendente riposa su sabato/domenica.
+            </div>
+          )}
+
           {isWeekHidden && (
             <div className={styles.wipCard}>
               <div className={styles.wipIcon}>📅</div>
