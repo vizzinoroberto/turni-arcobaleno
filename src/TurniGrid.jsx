@@ -256,8 +256,11 @@ export default function TurniGrid({ isAdmin, onLogout }) {
           setData(obj)
         }
       })
-      loadAssenze()
     }
+    // Ricarico sempre le assenze (non solo quando cambia il conteggio "in sospeso"):
+    // eliminare o cambiare stato a una richiesta già approvata/rifiutata non tocca il
+    // conteggio ma deve comunque aggiornare/rimuovere l'hint nel calendario.
+    loadAssenze()
   }, [loadAssenze])
 
   function adminOptions(service, val) {

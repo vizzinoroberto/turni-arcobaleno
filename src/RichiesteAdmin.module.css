@@ -156,6 +156,17 @@
 }
 .btnElimina:hover:not(:disabled) { background: #f5f5f5; color: #444; }
 
+.btnRifiutaSmall {
+  padding: 8px 14px;
+  background: transparent;
+  color: #c0392b;
+  border: 1px solid #c0392b;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btnRifiutaSmall:hover:not(:disabled) { background: #fef0f0; }
+
 .motivoBox {
   display: flex;
   flex-direction: column;
@@ -211,6 +222,8 @@
   justify-content: space-between;
   gap: 8px;
 }
+
+.statoBtns { display: flex; gap: 8px; }
 
 .statoBadge {
   align-self: flex-start;

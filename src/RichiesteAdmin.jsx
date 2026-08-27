@@ -224,17 +224,46 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
         )}
 
         {isStorico ? (
-          <div className={styles.statoBox}>
-            <div className={styles.statoRow}>
-              <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
-                {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
-              </span>
-              <button className={styles.btnElimina} onClick={() => eliminaAssenza(r)} disabled={isLoading}>
-                {isLoading ? 'Attendere...' : 'Elimina'}
-              </button>
+          showMotivoFor === r.id ? (
+            <div className={styles.motivoBox}>
+              <input
+                type="text"
+                className={styles.motivoInput}
+                placeholder="Motivo rifiuto (obbligatorio)"
+                value={motivoRifiuto[r.id] || ''}
+                onChange={e => setMotivoRifiuto({...motivoRifiuto, [r.id]: e.target.value})}
+              />
+              <div className={styles.motivoBtns}>
+                <button className={styles.btnAnnulla} onClick={() => setShowMotivoFor(null)}>Annulla</button>
+                <button
+                  className={styles.btnRifiuta}
+                  onClick={() => rifiutaAssenza(r)}
+                  disabled={isLoading || !(motivoRifiuto[r.id] || '').trim()}
+                >
+                  Conferma rifiuto
+                </button>
+              </div>
             </div>
-            {r.motivo_rifiuto && <span className={styles.motivoText}>Motivo: {r.motivo_rifiuto}</span>}
-          </div>
+          ) : (
+            <div className={styles.statoBox}>
+              <div className={styles.statoRow}>
+                <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
+                  {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
+                </span>
+                <div className={styles.statoBtns}>
+                  {r.stato === 'approvata' && (
+                    <button className={styles.btnRifiutaSmall} onClick={() => setShowMotivoFor(r.id)} disabled={isLoading}>
+                      ✗ Rifiuta
+                    </button>
+                  )}
+                  <button className={styles.btnElimina} onClick={() => eliminaAssenza(r)} disabled={isLoading}>
+                    {isLoading ? 'Attendere...' : 'Elimina'}
+                  </button>
+                </div>
+              </div>
+              {r.motivo_rifiuto && <span className={styles.motivoText}>Motivo: {r.motivo_rifiuto}</span>}
+            </div>
+          )
         ) : (
           <>
             {showMotivoFor === r.id && (
@@ -313,17 +342,51 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
         )}
 
         {isStorico ? (
-          <div className={styles.statoBox}>
-            <div className={styles.statoRow}>
-              <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
-                {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
-              </span>
-              <button className={styles.btnElimina} onClick={() => elimina(r)} disabled={isLoading}>
-                {isLoading ? 'Attendere...' : 'Elimina'}
-              </button>
+          showMotivoFor === r.id ? (
+            <div className={styles.motivoBox}>
+              {r.stato === 'approvata' && (
+                <span className={styles.motivoText}>
+                  I turni già scambiati non verranno annullati automaticamente: modificali a mano nel tab Turni se necessario.
+                </span>
+              )}
+              <input
+                type="text"
+                className={styles.motivoInput}
+                placeholder="Motivo rifiuto (obbligatorio)"
+                value={motivoRifiuto[r.id] || ''}
+                onChange={e => setMotivoRifiuto({...motivoRifiuto, [r.id]: e.target.value})}
+              />
+              <div className={styles.motivoBtns}>
+                <button className={styles.btnAnnulla} onClick={() => setShowMotivoFor(null)}>Annulla</button>
+                <button
+                  className={styles.btnRifiuta}
+                  onClick={() => rifiuta(r)}
+                  disabled={isLoading || !(motivoRifiuto[r.id] || '').trim()}
+                >
+                  Conferma rifiuto
+                </button>
+              </div>
             </div>
-            {r.motivo_rifiuto && <span className={styles.motivoText}>Motivo: {r.motivo_rifiuto}</span>}
-          </div>
+          ) : (
+            <div className={styles.statoBox}>
+              <div className={styles.statoRow}>
+                <span className={`${styles.statoBadge} ${styles[r.stato]}`}>
+                  {r.stato === 'approvata' ? '✓ Approvata' : '✗ Rifiutata'}
+                </span>
+                <div className={styles.statoBtns}>
+                  {r.stato === 'approvata' && (
+                    <button className={styles.btnRifiutaSmall} onClick={() => setShowMotivoFor(r.id)} disabled={isLoading}>
+                      ✗ Rifiuta
+                    </button>
+                  )}
+                  <button className={styles.btnElimina} onClick={() => elimina(r)} disabled={isLoading}>
+                    {isLoading ? 'Attendere...' : 'Elimina'}
+                  </button>
+                </div>
+              </div>
+              {r.motivo_rifiuto && <span className={styles.motivoText}>Motivo: {r.motivo_rifiuto}</span>}
+            </div>
+          )
         ) : (
           <>
             {showMotivoFor === r.id && (
