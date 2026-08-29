@@ -556,7 +556,6 @@
 .cutoffClearBtn:hover { background: #fecaca; }
 
 .cutoffSaveBtn {
-  align-self: flex-start;
   padding: 6px 16px;
   background: #1d4ed8;
   color: #fff;
@@ -568,3 +567,22 @@
   transition: background 0.15s;
 }
 .cutoffSaveBtn:hover { background: #1e40af; }
+
+.cutoffSaveRow {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cutoffSaveOk {
+  font-size: 13px;
+  font-weight: bold;
+  color: #15803d;
+}
+
+.cutoffSaveErr {
+  font-size: 13px;
+  font-weight: bold;
+  color: #c0392b;
+}

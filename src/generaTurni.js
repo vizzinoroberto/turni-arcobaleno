@@ -122,7 +122,13 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
         activeEmps.forEach(emp => { if (!excl(emp)) cena[emp] = String(sunTurno[emp]) })
       } else {
         // Martedì–Venerdì (+ festivi non lun/sab/dom)
-        if (dow === 2 && summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
+        // Chi riposa nel weekend (restingEmp) rientra il martedì con turno 4,
+        // per compensare il weekend libero. La regola estiva di Francesca ha
+        // priorità (se capita a lei di riposare, resta comunque il turno 5).
+        if (dow === 2) {
+          if (restingEmp && !excl(restingEmp)) cena[restingEmp] = '4'
+          if (summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
+        }
         if (dow === 3 && summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
         if (dow === 4 && summer && thurEmp && !excl(thurEmp))  cena[thurEmp] = '5'
         if (dow === 5) {

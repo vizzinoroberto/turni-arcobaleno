@@ -75,6 +75,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showAssenza, setShowAssenza] = useState(false)
   const [showGenera, setShowGenera] = useState(false)
   const [cutoffConfig, setCutoffConfig] = useState({ data: '', messaggio: '' })
+  const [cutoffSaveStatus, setCutoffSaveStatus] = useState('') // '' | 'ok' | 'err'
   const [richiestePending, setRichiestePending] = useState(0)
   const [assenze, setAssenze] = useState([])
   const [openHint, setOpenHint] = useState(null)
@@ -236,6 +237,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   }
 
   async function saveCutoffConfig() {
+    setCutoffSaveStatus('')
     const ops = []
     if (cutoffConfig.data) {
       ops.push(supabase.from('turni').upsert({ chiave: '__config__::data', valore: cutoffConfig.data }, { onConflict: 'chiave' }))
@@ -247,8 +249,15 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     } else {
       ops.push(supabase.from('turni').delete().eq('chiave', '__config__::messaggio'))
     }
-    await Promise.all(ops)
+    const results = await Promise.all(ops)
+    if (results.some(r => r.error)) {
+      setSyncStatus({ msg: 'Errore salvataggio ✗', cls: styles.err })
+      setCutoffSaveStatus('err')
+      return
+    }
     setSyncStatus({ msg: 'Impostazioni salvate ✓', cls: styles.ok })
+    setCutoffSaveStatus('ok')
+    setTimeout(() => setCutoffSaveStatus(''), 2500)
   }
 
   function handleNoteChange(val) {
@@ -612,7 +621,11 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                   <button className={styles.cutoffClearBtn} onClick={() => setCutoffConfig(prev => ({ ...prev, messaggio: '' }))}>✕</button>
                 )}
               </div>
-              <button className={styles.cutoffSaveBtn} onClick={saveCutoffConfig}>Salva impostazioni visibilità</button>
+              <div className={styles.cutoffSaveRow}>
+                <button className={styles.cutoffSaveBtn} onClick={saveCutoffConfig}>Salva impostazioni visibilità</button>
+                {cutoffSaveStatus === 'ok' && <span className={styles.cutoffSaveOk}>✓ OK, attivato</span>}
+                {cutoffSaveStatus === 'err' && <span className={styles.cutoffSaveErr}>✗ Errore, riprova</span>}
+              </div>
             </div>
           )}
         </>
