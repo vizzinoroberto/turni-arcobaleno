@@ -78,11 +78,13 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [richiestePending, setRichiestePending] = useState(0)
   const [assenze, setAssenze] = useState([])
   const [openHint, setOpenHint] = useState(null)
-  const [figureAssentiWeek, setFigureAssentiWeek] = useState([])
+  const [figureAssentiWeek, setFigureAssentiWeek] = useState({}) // { figura: [dateStr, ...] }
+  const [openFigureHint, setOpenFigureHint] = useState(null) // nome figura col popover aperto
   const saveTimer = useRef(null)
   const noteSaveTimer = useRef(null)
   const pendingRef = useRef({})
   const hintRef = useRef(null)
+  const figureHintRef = useRef(null)
 
   const weekKey = toDateStr(currentMonday)
   const days = getWeekDays(currentMonday)
@@ -110,18 +112,25 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     setAssenze(data || [])
   }, [isAdmin])
 
-  // Carica le figure (extra rispetto ai dipendenti) assenti sabato/domenica della
-  // settimana visualizzata, per avvisare chi scrive i turni a mano che quel
-  // weekend serve il turno 7 (nessuno riposa) invece del turno 6 abituale.
+  // Carica le figure (extra rispetto ai dipendenti) assenti nella settimana
+  // visualizzata, con l'elenco esatto dei giorni, per mostrare un hint cliccabile
+  // (uno per figura mancante) a chi scrive i turni a mano.
   const loadFigureAssenti = useCallback(async () => {
     if (!isAdmin) return
-    const satStr = toDateStr(addDays(currentMonday, 5))
-    const sunStr = toDateStr(addDays(currentMonday, 6))
+    const weekStart = toDateStr(currentMonday)
+    const weekEnd = toDateStr(addDays(currentMonday, 6))
     const { data } = await supabase
       .from('figure_assenze')
-      .select('figura')
-      .in('data', [satStr, sunStr])
-    setFigureAssentiWeek([...new Set((data || []).map(r => r.figura))])
+      .select('figura, data')
+      .gte('data', weekStart)
+      .lte('data', weekEnd)
+      .order('data', { ascending: true })
+    const obj = {}
+    ;(data || []).forEach(({ figura, data: ds }) => {
+      if (!obj[figura]) obj[figura] = []
+      obj[figura].push(ds)
+    })
+    setFigureAssentiWeek(obj)
   }, [isAdmin, currentMonday])
 
   useEffect(() => { loadFigureAssenti() }, [loadFigureAssenti])
@@ -165,6 +174,13 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     document.addEventListener('mousedown', fn)
     return () => document.removeEventListener('mousedown', fn)
   }, [openHint])
+
+  useEffect(() => {
+    if (!openFigureHint) return
+    const fn = (e) => { if (figureHintRef.current && !figureHintRef.current.contains(e.target)) setOpenFigureHint(null) }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [openFigureHint])
 
   async function flushPending() {
     const batch = { ...pendingRef.current }
@@ -385,9 +401,31 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
       {tab === 'turni' && (
         <>
-          {isAdmin && mode === 'admin' && figureAssentiWeek.length > 0 && (
-            <div className={styles.figureHint}>
-              ⚠️ Figura assente questo weekend: <strong>{figureAssentiWeek.join(', ')}</strong> → turno 7 attivo, nessun dipendente riposa su sabato/domenica.
+          {isAdmin && mode === 'admin' && Object.keys(figureAssentiWeek).length > 0 && (
+            <div className={styles.figureHintRow}>
+              <span className={styles.figureHintLabel}>Figure assenti questa settimana:</span>
+              {Object.entries(figureAssentiWeek).map(([figura, giorni]) => {
+                const isOpen = openFigureHint === figura
+                return (
+                  <span key={figura} className={styles.hintWrap} ref={isOpen ? figureHintRef : null}>
+                    <button
+                      type="button"
+                      className={styles.figureHintBadge}
+                      onClick={() => setOpenFigureHint(isOpen ? null : figura)}
+                    >
+                      👤 {figura}
+                    </button>
+                    {isOpen && (
+                      <div className={styles.hintPopover}>
+                        <div className={styles.hintPopoverTitle}>{figura} assente:</div>
+                        {giorni.map(ds => (
+                          <div key={ds} className={styles.hintPopoverItem}>{fmtHintDate(ds)}</div>
+                        ))}
+                      </div>
+                    )}
+                  </span>
+                )
+              })}
             </div>
           )}
 
