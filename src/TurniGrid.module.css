@@ -471,6 +471,19 @@
 }
 .generaBtn:hover { background: #5b21b6; }
 
+.configBtn {
+  padding: 7px 18px;
+  font-size: 13px;
+  background: #fff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.configBtn:hover { background: #f1f5f9; }
+
 /* ── Messaggio WIP per i dipendenti ── */
 .wipCard {
   margin: 24px 0;

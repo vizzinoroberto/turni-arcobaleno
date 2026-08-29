@@ -1,21 +1,17 @@
-import { EMPLOYEES, getMonday, addDays, toDateStr, getWeekDays, isFestivo, isSummer, EMPLOYEE_PERIODS } from './utils'
+import { EMPLOYEES, getMonday, addDays, toDateStr, getWeekDays, isFestivo, isSummer, isActivePeriod } from './utils'
 
 const FRANCESCA = 'Francesca Novello'
 
 // Controllo per-giorno (usato per mar/mer/gio/ven/dom)
-function isEmpExcluded(emp, dateStr, eccezioni) {
-  const period = EMPLOYEE_PERIODS[emp]
-  if (period?.to && dateStr > period.to) return true
-  if (period?.from && dateStr < period.from) return true
+function isEmpExcluded(emp, dateStr, eccezioni, periodiAttivi) {
+  if (!isActivePeriod(emp, dateStr, periodiAttivi)) return true
   return eccezioni.some(e => e.emp === emp && dateStr >= e.from && dateStr <= e.to)
 }
 
 // Controllo per la rotazione weekend: esclude chi ha un'eccezione che copre
 // sabato O domenica (se manca la domenica, non deve lavorare neanche il sabato)
-function isEmpExcludedWeekend(emp, satStr, sunStr, eccezioni) {
-  const period = EMPLOYEE_PERIODS[emp]
-  if (period?.to && satStr > period.to) return true
-  if (period?.from && satStr < period.from) return true
+function isEmpExcludedWeekend(emp, satStr, sunStr, eccezioni, periodiAttivi) {
+  if (!isActivePeriod(emp, satStr, periodiAttivi) || !isActivePeriod(emp, sunStr, periodiAttivi)) return true
   return eccezioni.some(e =>
     e.emp === emp && (
       (satStr >= e.from && satStr <= e.to) ||
@@ -35,7 +31,7 @@ function empConTurnoSabato(satTurno, turnoTarget, restingEmp) {
   return null
 }
 
-export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSettimana, eccezioni = []) {
+export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSettimana, eccezioni = [], turniFissi = [], periodiAttivi = {}) {
   // Ritorna { toUpsert: [{key, val}], toDelete: [key] }
   const toUpsert = []
   const toDelete = []
@@ -53,7 +49,7 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
     // Rotazione settimanale basata sul sabato
     const headIdx = weekOffset % startingOrder.length
     const rotatedFull = [...startingOrder.slice(headIdx), ...startingOrder.slice(0, headIdx)]
-    const rotated = rotatedFull.filter(emp => !isEmpExcludedWeekend(emp, satStr, sundayStr, eccezioni))
+    const rotated = rotatedFull.filter(emp => !isEmpExcludedWeekend(emp, satStr, sundayStr, eccezioni, periodiAttivi))
 
     const n = rotated.length
     if (n === 0) { monday = addDays(monday, 7); weekOffset++; continue }
@@ -106,7 +102,7 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
       const dow = day.getDay() // 0=dom 1=lun 2=mar 3=mer 4=gio 5=ven 6=sab
       const summer = isSummer(day)
       const festivo = isFestivo(day)
-      const excl = emp => isEmpExcluded(emp, ds, eccezioni)
+      const excl = emp => isEmpExcluded(emp, ds, eccezioni, periodiAttivi)
 
       // cena[emp] e pranzo[emp]: undefined = cancella, stringa = scrivi
       const cena = {}
@@ -123,18 +119,21 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
       } else {
         // Martedì–Venerdì (+ festivi non lun/sab/dom)
         // Chi riposa nel weekend (restingEmp) rientra il martedì con turno 4,
-        // per compensare il weekend libero. La regola estiva di Francesca ha
-        // priorità (se capita a lei di riposare, resta comunque il turno 5).
-        if (dow === 2) {
-          if (restingEmp && !excl(restingEmp)) cena[restingEmp] = '4'
-          if (summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
-        }
-        if (dow === 3 && summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
+        // per compensare il weekend libero.
+        if (dow === 2 && restingEmp && !excl(restingEmp)) cena[restingEmp] = '4'
         if (dow === 4 && summer && thurEmp && !excl(thurEmp))  cena[thurEmp] = '5'
-        if (dow === 5) {
-          if (summer && !excl(FRANCESCA)) cena[FRANCESCA] = '5'
-          if (friEmp && !excl(friEmp))    cena[friEmp] = '4'
-        }
+        if (dow === 5 && friEmp && !excl(friEmp))    cena[friEmp] = '4'
+
+        // Turni fissi configurabili (es. Francesca Novello mar/mer/ven in un
+        // certo periodo): applicati per ultimi così hanno sempre la precedenza
+        // sulle regole automatiche sopra.
+        turniFissi.forEach(regola => {
+          if (!regola.giorni.includes(dow)) return
+          if (regola.from && ds < regola.from) return
+          if (regola.to && ds > regola.to) return
+          if (excl(regola.emp)) return
+          cena[regola.emp] = regola.turno
+        })
       }
 
       // Pranzo: solo domenica e festivi (sabato escluso)

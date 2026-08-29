@@ -16,11 +16,16 @@ export function isSummer(d) {
   return m >= 6 && m <= 9
 }
 
-// Data di fine contratto per dipendenti con validità limitata
-export const EMPLOYEE_PERIODS = {
-  'Nicole Cavalli': { to: '2026-09-30' }
-}
 export const PASSWORD_STAFF = 'arcoturni'
+
+// periodiAttivi: { [dipendente]: [{ from, to }, ...] } — righe "periodo_attivo"
+// lette dalla tabella dipendenti_config. Se un dipendente non ha voci è sempre
+// attivo (comportamento di default per la maggior parte dei dipendenti).
+export function isActivePeriod(emp, dateStr, periodiAttivi) {
+  const periodi = periodiAttivi[emp]
+  if (!periodi || periodi.length === 0) return true
+  return periodi.some(p => (!p.from || dateStr >= p.from) && (!p.to || dateStr <= p.to))
+}
 
 export const EMPLOYEES = [
   'Francesca Novello',

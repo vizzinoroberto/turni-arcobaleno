@@ -4,11 +4,27 @@ import { EMPLOYEES, getMonday, addDays, toDateStr } from './utils'
 import { generaTurni } from './generaTurni'
 import styles from './GeneraTurniModal.module.css'
 
-const NICOLE_END = '2026-09-30'
+const DOW_LABEL = { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Gio', 5: 'Ven', 6: 'Sab' }
 
 function fmt(dateStr) {
   const [y, m, d] = dateStr.split('-')
   return `${d}/${m}/${y.slice(2)}`
+}
+
+function turniFissiLabel(emp, turniFissi) {
+  const rules = turniFissi.filter(r => r.emp === emp)
+  if (rules.length === 0) return null
+  return rules
+    .map(r => [...r.giorni].sort().map(d => DOW_LABEL[d]).join('/') + ' fissi')
+    .join(', ')
+}
+
+// True se il periodo [fromStr, toStr] è interamente coperto da almeno uno dei
+// periodi di attività del dipendente (nessun periodo configurato = sempre attivo).
+function isFullyCovered(emp, fromStr, toStr, periodiAttivi) {
+  const periodi = periodiAttivi[emp]
+  if (!periodi || periodi.length === 0) return true
+  return periodi.some(p => (!p.from || fromStr >= p.from) && (!p.to || toStr <= p.to))
 }
 
 function countWeeks(fromStr, toStr) {
@@ -37,11 +53,34 @@ export default function GeneraTurniModal({ onClose, onApply }) {
   const [assenzeApprovate, setAssenzeApprovate] = useState([])
 
   const [figureAssenze, setFigureAssenze] = useState({})
+  const [turniFissi, setTurniFissi] = useState([])
+  const [periodiAttivi, setPeriodiAttivi] = useState({})
   const [step, setStep] = useState('config')
   const [preview, setPreview] = useState(null) // { toUpsert, toDelete }
   const [saving, setSaving] = useState(false)
 
-  const nicoleWarning = to > NICOLE_END
+  const periodoWarnings = Object.keys(periodiAttivi).filter(emp => !isFullyCovered(emp, from, to, periodiAttivi))
+
+  useEffect(() => {
+    supabase.from('dipendenti_config').select('*').then(({ data }) => {
+      const rows = data || []
+      setTurniFissi(
+        rows.filter(r => r.tipo === 'turno_fisso').map(r => ({
+          emp: r.dipendente,
+          giorni: r.giorni || [],
+          turno: r.turno,
+          from: r.data_inizio,
+          to: r.data_fine,
+        }))
+      )
+      const periodi = {}
+      rows.filter(r => r.tipo === 'periodo_attivo').forEach(r => {
+        if (!periodi[r.dipendente]) periodi[r.dipendente] = []
+        periodi[r.dipendente].push({ from: r.data_inizio, to: r.data_fine })
+      })
+      setPeriodiAttivi(periodi)
+    })
+  }, [])
 
   useEffect(() => {
     if (!from || !to) return
@@ -127,7 +166,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
         ({ emp: nome_richiedente, from: data_inizio, to: data_fine })),
       ...indisponibilita.map(({ emp, from: f, to: t }) => ({ emp, from: f, to: t })),
     ]
-    const result = generaTurni(new Date(from), new Date(to), startingOrder, figureAssenze, eccezioni)
+    const result = generaTurni(new Date(from), new Date(to), startingOrder, figureAssenze, eccezioni, turniFissi, periodiAttivi)
     setPreview(result)
     setStep('confirm')
   }
@@ -194,9 +233,9 @@ export default function GeneraTurniModal({ onClose, onApply }) {
               {from && to && (
                 <span className={styles.weekCount}>~{countWeeks(from, to)} settimane · {fmt(from)} – {fmt(to)}</span>
               )}
-              {nicoleWarning && (
+              {periodoWarnings.length > 0 && (
                 <div className={styles.infoBox}>
-                  Il periodo supera il 30/09/2026 — <strong>Nicole Cavalli</strong> verrà esclusa automaticamente dal 01/10/2026 in poi.
+                  Il periodo include date fuori dai periodi di attività configurati per <strong>{periodoWarnings.join(', ')}</strong>: verrà esclusa/o automaticamente in quei giorni. Modificabile in "⚙️ Impostazioni dipendenti".
                 </div>
               )}
             </div>
@@ -233,8 +272,8 @@ export default function GeneraTurniModal({ onClose, onApply }) {
                       />
                       <span className={styles.sunTurno}>{sunT > 0 ? sunT : '—'}</span>
                       <span className={styles.noteTag}>
-                        {emp === 'Francesca Novello'
-                          ? <span className={styles.tagBlue}>Mar/Mer/Ven fissi</span>
+                        {turniFissiLabel(emp, turniFissi)
+                          ? <span className={styles.tagBlue}>{turniFissiLabel(emp, turniFissi)}</span>
                           : isLast ? <span className={styles.tagGreen}>Viene giovedì</span>
                           : isThird ? <span className={styles.tagOrange}>Viene venerdì</span>
                           : null}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 import {
-  EMPLOYEES, EMPLOYEE_PERIODS, DOW_LABELS, getMonday, addDays, toDateStr,
+  EMPLOYEES, DOW_LABELS, getMonday, addDays, toDateStr,
   formatDateVertical, isWeekend, isSunday, getWeekDays, shiftToDisplay
 } from './utils'
 import Statistiche from './Statistiche.jsx'
@@ -12,6 +12,7 @@ import RichiestaAssenzaModal from './RichiestaAssenzaModal.jsx'
 import RichiesteAdmin from './RichiesteAdmin.jsx'
 import FigureTab from './FigureTab.jsx'
 import GeneraTurniModal from './GeneraTurniModal.jsx'
+import DipendentiConfigModal from './DipendentiConfigModal.jsx'
 import styles from './TurniGrid.module.css'
 import { FESTIVI } from './utils'
 
@@ -74,6 +75,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showCambio, setShowCambio] = useState(false)
   const [showAssenza, setShowAssenza] = useState(false)
   const [showGenera, setShowGenera] = useState(false)
+  const [showDipendentiConfig, setShowDipendentiConfig] = useState(false)
+  const [periodiAttivi, setPeriodiAttivi] = useState({}) // { [dipendente]: [{from,to}, ...] }
   const [cutoffConfig, setCutoffConfig] = useState({ data: '', messaggio: '' })
   const [cutoffSaveStatus, setCutoffSaveStatus] = useState('') // '' | 'ok' | 'err'
   const [richiestePending, setRichiestePending] = useState(0)
@@ -135,6 +138,24 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   }, [isAdmin, currentMonday])
 
   useEffect(() => { loadFigureAssenti() }, [loadFigureAssenti])
+
+  // Carica i periodi di attività limitata (es. Nicole Cavalli) per nascondere
+  // dalla griglia i dipendenti fuori organico. Riguarda tutti i visualizzatori,
+  // non solo l'admin, quindi non dipende da isAdmin.
+  const loadPeriodiAttivi = useCallback(async () => {
+    const { data } = await supabase
+      .from('dipendenti_config')
+      .select('dipendente, data_inizio, data_fine')
+      .eq('tipo', 'periodo_attivo')
+    const obj = {}
+    ;(data || []).forEach(({ dipendente, data_inizio, data_fine }) => {
+      if (!obj[dipendente]) obj[dipendente] = []
+      obj[dipendente].push({ from: data_inizio, to: data_fine })
+    })
+    setPeriodiAttivi(obj)
+  }, [])
+
+  useEffect(() => { loadPeriodiAttivi() }, [loadPeriodiAttivi])
 
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
@@ -344,13 +365,15 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
   const isWeekHidden = !isAdmin && !!cutoffConfig.data && toDateStr(currentMonday) > cutoffConfig.data
 
-  // Filtra dipendenti attivi per la settimana visualizzata (usa il lunedì come riferimento)
+  // Filtra dipendenti attivi per la settimana visualizzata: visibile se almeno
+  // uno dei suoi periodi di attività si sovrappone alla settimana (nessun
+  // periodo configurato = sempre visibile).
   const visibleEmployees = EMPLOYEES.filter(emp => {
-    const period = EMPLOYEE_PERIODS[emp]
-    if (!period) return true
-    if (period.to && toDateStr(currentMonday) > period.to) return false
-    if (period.from && toDateStr(addDays(currentMonday, 6)) < period.from) return false
-    return true
+    const periodi = periodiAttivi[emp]
+    if (!periodi || periodi.length === 0) return true
+    const weekStart = toDateStr(currentMonday)
+    const weekEnd = toDateStr(addDays(currentMonday, 6))
+    return periodi.some(p => (!p.to || weekStart <= p.to) && (!p.from || weekEnd >= p.from))
   })
 
   // Richieste di assenza (in sospeso o approvate) che si sovrappongono alla settimana visualizzata
@@ -547,6 +570,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
           {isAdmin && mode === 'admin' && (
             <div className={styles.exportBar} style={{marginTop: 0, marginBottom: 0}}>
               <button className={styles.generaBtn} onClick={() => setShowGenera(true)}>⚡ Genera turni</button>
+              <button className={styles.configBtn} onClick={() => setShowDipendentiConfig(true)}>⚙️ Impostazioni dipendenti</button>
             </div>
           )}
 
@@ -639,6 +663,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
         <GeneraTurniModal
           onClose={() => setShowGenera(false)}
           onApply={() => { setShowGenera(false); loadData() }}
+        />
+      )}
+      {showDipendentiConfig && (
+        <DipendentiConfigModal
+          onClose={() => setShowDipendentiConfig(false)}
+          onSaved={loadPeriodiAttivi}
         />
       )}
     </div>
