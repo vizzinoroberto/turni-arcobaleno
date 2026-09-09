@@ -564,7 +564,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                               style={{ backgroundColor: cellBg(ei, d) }}
                             >
                               {mode === 'admin' ? (
-                                <select className={selectClass(val)} value={val} onChange={e => handleChange(key, e.target.value)}>
+                                <select
+                                  className={selectClass(val)}
+                                  value={val}
+                                  onChange={e => { handleChange(key, e.target.value); e.target.blur() }}
+                                  onWheel={e => e.target.blur()}
+                                >
                                   {adminOptions(service, val)}
                                 </select>
                               ) : (
@@ -677,6 +682,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       {showGenera && (
         <GeneraTurniModal
           employees={employees}
+          data={data}
           onClose={() => setShowGenera(false)}
           onApply={() => { setShowGenera(false); loadData() }}
         />

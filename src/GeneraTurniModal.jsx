@@ -37,7 +37,7 @@ function countWeeks(fromStr, toStr) {
   return Math.max(1, Math.ceil((to - from) / (7 * 86400000)) + 1)
 }
 
-export default function GeneraTurniModal({ employees, onClose, onApply }) {
+export default function GeneraTurniModal({ employees, data, onClose, onApply }) {
   const today = toDateStr(new Date())
   const defaultTo = toDateStr(addDays(new Date(), 27))
 
@@ -176,7 +176,7 @@ export default function GeneraTurniModal({ employees, onClose, onApply }) {
         ({ emp: nome_richiedente, from: data_inizio, to: data_fine })),
       ...indisponibilita.map(({ emp, from: f, to: t }) => ({ emp, from: f, to: t })),
     ]
-    const result = generaTurni(new Date(from), new Date(to), startingOrder, figureAssenze, eccezioni, turniFissi, periodiDip)
+    const result = generaTurni(new Date(from), new Date(to), startingOrder, figureAssenze, eccezioni, turniFissi, periodiDip, data)
     setPreview(result)
     setStep('confirm')
   }
@@ -379,8 +379,8 @@ export default function GeneraTurniModal({ employees, onClose, onApply }) {
                   Altre indisponibilità applicate: {indisponibilita.map(e => `${e.emp.split(' ')[0]} (${fmt(e.from)}–${fmt(e.to)})`).join(', ')}
                 </div>
               )}
-              <div className={styles.warning}>
-                Le celle già compilate nel database verranno sovrascritte.
+              <div className={styles.infoBox}>
+                Le celle già compilate (turni manuali, FERIE, o generazioni precedenti) non vengono mai toccate: la generazione riempie solo le celle vuote.
               </div>
             </div>
             <div className={styles.btnRow}>

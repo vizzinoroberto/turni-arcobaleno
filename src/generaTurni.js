@@ -31,7 +31,7 @@ function empConTurnoSabato(satTurno, turnoTarget, restingEmp) {
   return null
 }
 
-export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSettimana, eccezioni = [], turniFissi = [], periodiDip = {}) {
+export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSettimana, eccezioni = [], turniFissi = [], periodiDip = {}, existingData = {}) {
   // Ritorna { toUpsert: [{key, val}], toDelete: [key] }
   const toUpsert = []
   const toDelete = []
@@ -143,14 +143,21 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
       }
 
       // Emetti record per tutti i dipendenti (startingOrder è una permutazione
-      // dell'intero elenco, non solo dei rotanti nel weekend)
+      // dell'intero elenco, non solo dei rotanti nel weekend). Una cella che ha
+      // già un valore (turno inserito a mano, FERIE, o generato in precedenza)
+      // non viene mai toccata: la generazione automatica riempie solo le celle
+      // vuote, non sovrascrive né cancella nulla di già presente.
       startingOrder.forEach(emp => {
         const cKey = `${emp}::${ds}::cena`
         const pKey = `${emp}::${ds}::pranzo`
-        if (cena[emp] !== undefined) toUpsert.push({ key: cKey, val: cena[emp] })
-        else                          toDelete.push(cKey)
-        if (pranzo[emp] !== undefined) toUpsert.push({ key: pKey, val: pranzo[emp] })
-        else                           toDelete.push(pKey)
+        if (!existingData[cKey]) {
+          if (cena[emp] !== undefined) toUpsert.push({ key: cKey, val: cena[emp] })
+          else                          toDelete.push(cKey)
+        }
+        if (!existingData[pKey]) {
+          if (pranzo[emp] !== undefined) toUpsert.push({ key: pKey, val: pranzo[emp] })
+          else                           toDelete.push(pKey)
+        }
       })
     })
 
