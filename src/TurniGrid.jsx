@@ -16,10 +16,22 @@ import DipendentiConfigModal from './DipendentiConfigModal.jsx'
 import styles from './TurniGrid.module.css'
 import { FESTIVI } from './utils'
 
-// DEBUG TEMPORANEO: traccia gli eventi sulle select turni per individuare la
-// causa delle cancellazioni impreviste segnalate. Da rimuovere a fix confermata.
-function logDebug(payload) {
-  supabase.from('debug_log').insert({ payload }).then(() => {})
+// PostgREST tronca silenziosamente le select oltre le 1000 righe di default:
+// la tabella "turni" le ha superate da tempo, quindi un select semplice
+// perdeva le righe oltre la millesima (apparivano come celle vuote anche se
+// il valore era salvato). Pagina esplicitamente finché non risultano più righe.
+async function fetchAllTurni() {
+  const pageSize = 1000
+  let from = 0
+  let all = []
+  while (true) {
+    const { data, error } = await supabase.from('turni').select('chiave, valore').range(from, from + pageSize - 1)
+    if (error) return { data: null, error }
+    all = all.concat(data)
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+  return { data: all, error: null }
 }
 
 const EMP_COLORS = [
@@ -185,7 +197,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
     const ops = [
-      supabase.from('turni').select('chiave, valore'),
+      fetchAllTurni(),
       supabase.from('note_settimana').select('settimana, testo')
     ]
     const results = await Promise.all(ops)
@@ -337,7 +349,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     setRichiestePending(newCount)
     // Ricarica i turni se siamo in admin (potrebbero essere stati modificati da un'approvazione)
     if (changed) {
-      supabase.from('turni').select('chiave, valore').then(({ data: rows }) => {
+      fetchAllTurni().then(({ data: rows }) => {
         if (rows) {
           const obj = {}
           rows.forEach(r => { if (!r.chiave.startsWith('__config__::')) obj[r.chiave] = r.valore })
@@ -573,26 +585,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                                 <select
                                   className={selectClass(val)}
                                   value={val}
-                                  onChange={e => {
-                                    const newVal = e.target.value
-                                    logDebug({
-                                      t: newVal ? 'change' : 'change-empty',
-                                      key, prevVal: val, newVal,
-                                      isTrusted: e.nativeEvent && e.nativeEvent.isTrusted,
-                                      active: document.activeElement === e.target,
-                                      ts: Date.now(),
-                                    })
-                                    handleChange(key, newVal)
-                                    e.target.blur()
-                                  }}
-                                  onWheel={e => {
-                                    logDebug({
-                                      t: 'wheel', key, val, deltaY: e.deltaY,
-                                      active: document.activeElement === e.target,
-                                      ts: Date.now(),
-                                    })
-                                    e.target.blur()
-                                  }}
+                                  onChange={e => { handleChange(key, e.target.value); e.target.blur() }}
+                                  onWheel={e => e.target.blur()}
                                 >
                                   {adminOptions(service, val)}
                                 </select>
