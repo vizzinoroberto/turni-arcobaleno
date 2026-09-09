@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 import {
   EMPLOYEES, DOW_LABELS, getMonday, addDays, toDateStr,
-  formatDateVertical, isWeekend, isSunday, getWeekDays, shiftToDisplay
+  formatDateVertical, isWeekend, isSunday, getWeekDays, shiftToDisplay, isActivePeriod
 } from './utils'
 import Statistiche from './Statistiche.jsx'
 import ExportModal from './ExportModal.jsx'
@@ -76,7 +76,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showAssenza, setShowAssenza] = useState(false)
   const [showGenera, setShowGenera] = useState(false)
   const [showDipendentiConfig, setShowDipendentiConfig] = useState(false)
-  const [periodiAttivi, setPeriodiAttivi] = useState({}) // { [dipendente]: [{from,to}, ...] }
+  const [periodiDip, setPeriodiDip] = useState({}) // { [dipendente]: [{from,to,modo}, ...] }
   const [cutoffConfig, setCutoffConfig] = useState({ data: '', messaggio: '' })
   const [cutoffSaveStatus, setCutoffSaveStatus] = useState('') // '' | 'ok' | 'err'
   const [richiestePending, setRichiestePending] = useState(0)
@@ -139,23 +139,27 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
   useEffect(() => { loadFigureAssenti() }, [loadFigureAssenti])
 
-  // Carica i periodi di attività limitata (es. Nicole Cavalli) per nascondere
-  // dalla griglia i dipendenti fuori organico. Riguarda tutti i visualizzatori,
+  // Carica i periodi di assenza e di attività limitata per nascondere dalla
+  // griglia i dipendenti fuori organico. Riguarda tutti i visualizzatori,
   // non solo l'admin, quindi non dipende da isAdmin.
-  const loadPeriodiAttivi = useCallback(async () => {
+  const loadPeriodiDip = useCallback(async () => {
     const { data } = await supabase
       .from('dipendenti_config')
-      .select('dipendente, data_inizio, data_fine')
-      .eq('tipo', 'periodo_attivo')
+      .select('dipendente, tipo, data_inizio, data_fine')
+      .in('tipo', ['periodo_attivo', 'periodo_assente'])
     const obj = {}
-    ;(data || []).forEach(({ dipendente, data_inizio, data_fine }) => {
+    ;(data || []).forEach(({ dipendente, tipo, data_inizio, data_fine }) => {
       if (!obj[dipendente]) obj[dipendente] = []
-      obj[dipendente].push({ from: data_inizio, to: data_fine })
+      obj[dipendente].push({
+        from: data_inizio,
+        to: data_fine,
+        modo: tipo === 'periodo_assente' ? 'assente' : 'attivo',
+      })
     })
-    setPeriodiAttivi(obj)
+    setPeriodiDip(obj)
   }, [])
 
-  useEffect(() => { loadPeriodiAttivi() }, [loadPeriodiAttivi])
+  useEffect(() => { loadPeriodiDip() }, [loadPeriodiDip])
 
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
@@ -365,16 +369,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
 
   const isWeekHidden = !isAdmin && !!cutoffConfig.data && toDateStr(currentMonday) > cutoffConfig.data
 
-  // Filtra dipendenti attivi per la settimana visualizzata: visibile se almeno
-  // uno dei suoi periodi di attività si sovrappone alla settimana (nessun
-  // periodo configurato = sempre visibile).
-  const visibleEmployees = EMPLOYEES.filter(emp => {
-    const periodi = periodiAttivi[emp]
-    if (!periodi || periodi.length === 0) return true
-    const weekStart = toDateStr(currentMonday)
-    const weekEnd = toDateStr(addDays(currentMonday, 6))
-    return periodi.some(p => (!p.to || weekStart <= p.to) && (!p.from || weekEnd >= p.from))
-  })
+  // Filtra dipendenti attivi per la settimana visualizzata: la riga resta
+  // visibile se il dipendente è attivo in almeno un giorno della settimana
+  // (nessun periodo configurato = sempre visibile).
+  const visibleEmployees = EMPLOYEES.filter(emp =>
+    days.some(d => isActivePeriod(emp, toDateStr(d), periodiDip))
+  )
 
   // Richieste di assenza (in sospeso o approvate) che si sovrappongono alla settimana visualizzata
   const weekStartStr = toDateStr(currentMonday)
@@ -668,7 +668,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       {showDipendentiConfig && (
         <DipendentiConfigModal
           onClose={() => setShowDipendentiConfig(false)}
-          onSaved={loadPeriodiAttivi}
+          onSaved={loadPeriodiDip}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { EMPLOYEES, getMonday, addDays, toDateStr } from './utils'
+import { EMPLOYEES, getMonday, addDays, toDateStr, isActivePeriod } from './utils'
 import { generaTurni } from './generaTurni'
 import styles from './GeneraTurniModal.module.css'
 
@@ -19,12 +19,16 @@ function turniFissiLabel(emp, turniFissi) {
     .join(', ')
 }
 
-// True se il periodo [fromStr, toStr] è interamente coperto da almeno uno dei
-// periodi di attività del dipendente (nessun periodo configurato = sempre attivo).
-function isFullyCovered(emp, fromStr, toStr, periodiAttivi) {
-  const periodi = periodiAttivi[emp]
+// True se il dipendente è attivo in ogni giorno del periodo [fromStr, toStr]
+// (nessun periodo configurato = sempre attivo).
+function isFullyCovered(emp, fromStr, toStr, periodiDip) {
+  const periodi = periodiDip[emp]
   if (!periodi || periodi.length === 0) return true
-  return periodi.some(p => (!p.from || fromStr >= p.from) && (!p.to || toStr <= p.to))
+  const last = new Date(toStr)
+  for (let d = new Date(fromStr); d <= last; d = addDays(d, 1)) {
+    if (!isActivePeriod(emp, toDateStr(d), periodiDip)) return false
+  }
+  return true
 }
 
 function countWeeks(fromStr, toStr) {
@@ -54,12 +58,14 @@ export default function GeneraTurniModal({ onClose, onApply }) {
 
   const [figureAssenze, setFigureAssenze] = useState({})
   const [turniFissi, setTurniFissi] = useState([])
-  const [periodiAttivi, setPeriodiAttivi] = useState({})
+  const [periodiDip, setPeriodiDip] = useState({})
   const [step, setStep] = useState('config')
   const [preview, setPreview] = useState(null) // { toUpsert, toDelete }
   const [saving, setSaving] = useState(false)
 
-  const periodoWarnings = Object.keys(periodiAttivi).filter(emp => !isFullyCovered(emp, from, to, periodiAttivi))
+  const periodoWarnings = (from && to)
+    ? Object.keys(periodiDip).filter(emp => !isFullyCovered(emp, from, to, periodiDip))
+    : []
 
   useEffect(() => {
     supabase.from('dipendenti_config').select('*').then(({ data }) => {
@@ -74,11 +80,15 @@ export default function GeneraTurniModal({ onClose, onApply }) {
         }))
       )
       const periodi = {}
-      rows.filter(r => r.tipo === 'periodo_attivo').forEach(r => {
+      rows.filter(r => r.tipo === 'periodo_attivo' || r.tipo === 'periodo_assente').forEach(r => {
         if (!periodi[r.dipendente]) periodi[r.dipendente] = []
-        periodi[r.dipendente].push({ from: r.data_inizio, to: r.data_fine })
+        periodi[r.dipendente].push({
+          from: r.data_inizio,
+          to: r.data_fine,
+          modo: r.tipo === 'periodo_assente' ? 'assente' : 'attivo',
+        })
       })
-      setPeriodiAttivi(periodi)
+      setPeriodiDip(periodi)
     })
   }, [])
 
@@ -166,7 +176,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
         ({ emp: nome_richiedente, from: data_inizio, to: data_fine })),
       ...indisponibilita.map(({ emp, from: f, to: t }) => ({ emp, from: f, to: t })),
     ]
-    const result = generaTurni(new Date(from), new Date(to), startingOrder, figureAssenze, eccezioni, turniFissi, periodiAttivi)
+    const result = generaTurni(new Date(from), new Date(to), startingOrder, figureAssenze, eccezioni, turniFissi, periodiDip)
     setPreview(result)
     setStep('confirm')
   }
@@ -235,7 +245,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
               )}
               {periodoWarnings.length > 0 && (
                 <div className={styles.infoBox}>
-                  Il periodo include date fuori dai periodi di attività configurati per <strong>{periodoWarnings.join(', ')}</strong>: verrà esclusa/o automaticamente in quei giorni. Modificabile in "⚙️ Impostazioni dipendenti".
+                  Il periodo include date in cui <strong>{periodoWarnings.join(', ')}</strong> non è attiva/o (assenze o attività limitata): verrà esclusa/o automaticamente in quei giorni. Modificabile in "⚙️ Impostazioni dipendenti".
                 </div>
               )}
             </div>

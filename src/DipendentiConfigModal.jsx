@@ -39,9 +39,10 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
         }))
       )
       setPeriodi(
-        rows.filter(r => r.tipo === 'periodo_attivo').map(r => ({
+        rows.filter(r => r.tipo === 'periodo_attivo' || r.tipo === 'periodo_assente').map(r => ({
           id: r.id,
           emp: r.dipendente,
+          modo: r.tipo === 'periodo_assente' ? 'assente' : 'attivo',
           from: r.data_inizio || '',
           to: r.data_fine || '',
         }))
@@ -68,7 +69,7 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
   }
 
   function addPeriodo() {
-    setPeriodi(prev => [...prev, { id: localId(), emp: EMPLOYEES[0], from: '', to: '' }])
+    setPeriodi(prev => [...prev, { id: localId(), emp: EMPLOYEES[0], modo: 'assente', from: '', to: '' }])
   }
   function updatePeriodo(id, field, value) {
     setPeriodi(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
@@ -94,7 +95,7 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
         })),
       ...periodi.map(r => ({
         dipendente: r.emp,
-        tipo: 'periodo_attivo',
+        tipo: r.modo === 'assente' ? 'periodo_assente' : 'periodo_attivo',
         data_inizio: r.from || null,
         data_fine: r.to || null,
         giorni: null,
@@ -181,18 +182,22 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <label className={styles.label}>
-                  Periodi di attività limitata
-                  <span className={styles.labelHint}>— un dipendente senza periodi qui è sempre attivo; con uno o più periodi è visibile e disponibile solo in quelle finestre</span>
+                  Periodi di assenza / attività limitata
+                  <span className={styles.labelHint}>— "assente" nasconde il dipendente dal calendario in quella finestra; "attivo solo" lo rende visibile esclusivamente in quella finestra (e nascosto in tutte le altre date)</span>
                 </label>
                 <button className={styles.addBtn} onClick={addPeriodo}>+ Aggiungi</button>
               </div>
               {periodi.length === 0 && (
-                <span className={styles.emptyHint}>Nessuna limitazione: tutti i dipendenti sono sempre attivi.</span>
+                <span className={styles.emptyHint}>Nessun periodo configurato: tutti i dipendenti sono sempre attivi.</span>
               )}
               {periodi.map(r => (
                 <div key={r.id} className={styles.ruleRow}>
                   <select className={styles.empSelect} value={r.emp} onChange={e => updatePeriodo(r.id, 'emp', e.target.value)}>
                     {EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                  </select>
+                  <select className={styles.modoSelect} value={r.modo} onChange={e => updatePeriodo(r.id, 'modo', e.target.value)}>
+                    <option value="assente">assente</option>
+                    <option value="attivo">attivo solo</option>
                   </select>
                   <span className={styles.ruleLabel}>dal</span>
                   <input type="date" className={styles.dateInput} value={r.from} onChange={e => updatePeriodo(r.id, 'from', e.target.value)} />

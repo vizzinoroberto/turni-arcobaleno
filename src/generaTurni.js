@@ -3,15 +3,15 @@ import { EMPLOYEES, getMonday, addDays, toDateStr, getWeekDays, isFestivo, isSum
 const FRANCESCA = 'Francesca Novello'
 
 // Controllo per-giorno (usato per mar/mer/gio/ven/dom)
-function isEmpExcluded(emp, dateStr, eccezioni, periodiAttivi) {
-  if (!isActivePeriod(emp, dateStr, periodiAttivi)) return true
+function isEmpExcluded(emp, dateStr, eccezioni, periodiDip) {
+  if (!isActivePeriod(emp, dateStr, periodiDip)) return true
   return eccezioni.some(e => e.emp === emp && dateStr >= e.from && dateStr <= e.to)
 }
 
 // Controllo per la rotazione weekend: esclude chi ha un'eccezione che copre
 // sabato O domenica (se manca la domenica, non deve lavorare neanche il sabato)
-function isEmpExcludedWeekend(emp, satStr, sunStr, eccezioni, periodiAttivi) {
-  if (!isActivePeriod(emp, satStr, periodiAttivi) || !isActivePeriod(emp, sunStr, periodiAttivi)) return true
+function isEmpExcludedWeekend(emp, satStr, sunStr, eccezioni, periodiDip) {
+  if (!isActivePeriod(emp, satStr, periodiDip) || !isActivePeriod(emp, sunStr, periodiDip)) return true
   return eccezioni.some(e =>
     e.emp === emp && (
       (satStr >= e.from && satStr <= e.to) ||
@@ -31,7 +31,7 @@ function empConTurnoSabato(satTurno, turnoTarget, restingEmp) {
   return null
 }
 
-export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSettimana, eccezioni = [], turniFissi = [], periodiAttivi = {}) {
+export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSettimana, eccezioni = [], turniFissi = [], periodiDip = {}) {
   // Ritorna { toUpsert: [{key, val}], toDelete: [key] }
   const toUpsert = []
   const toDelete = []
@@ -49,7 +49,7 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
     // Rotazione settimanale basata sul sabato
     const headIdx = weekOffset % startingOrder.length
     const rotatedFull = [...startingOrder.slice(headIdx), ...startingOrder.slice(0, headIdx)]
-    const rotated = rotatedFull.filter(emp => !isEmpExcludedWeekend(emp, satStr, sundayStr, eccezioni, periodiAttivi))
+    const rotated = rotatedFull.filter(emp => !isEmpExcludedWeekend(emp, satStr, sundayStr, eccezioni, periodiDip))
 
     const n = rotated.length
     if (n === 0) { monday = addDays(monday, 7); weekOffset++; continue }
@@ -102,7 +102,7 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
       const dow = day.getDay() // 0=dom 1=lun 2=mar 3=mer 4=gio 5=ven 6=sab
       const summer = isSummer(day)
       const festivo = isFestivo(day)
-      const excl = emp => isEmpExcluded(emp, ds, eccezioni, periodiAttivi)
+      const excl = emp => isEmpExcluded(emp, ds, eccezioni, periodiDip)
 
       // cena[emp] e pranzo[emp]: undefined = cancella, stringa = scrivi
       const cena = {}

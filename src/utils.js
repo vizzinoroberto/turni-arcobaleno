@@ -18,13 +18,22 @@ export function isSummer(d) {
 
 export const PASSWORD_STAFF = 'arcoturni'
 
-// periodiAttivi: { [dipendente]: [{ from, to }, ...] } — righe "periodo_attivo"
-// lette dalla tabella dipendenti_config. Se un dipendente non ha voci è sempre
-// attivo (comportamento di default per la maggior parte dei dipendenti).
-export function isActivePeriod(emp, dateStr, periodiAttivi) {
-  const periodi = periodiAttivi[emp]
+// periodiDip: { [dipendente]: [{ from, to, modo }, ...] } — righe "periodo_attivo"
+// (modo 'attivo') e "periodo_assente" (modo 'assente') lette da dipendenti_config.
+// Regole: un periodo di assenza che copre la data vince sempre; altrimenti, se il
+// dipendente ha almeno un periodo di attività, la data deve cadere dentro uno di
+// essi. Nessuna voce configurata = sempre attivo (default della maggior parte).
+function coversDate(p, dateStr) {
+  return (!p.from || dateStr >= p.from) && (!p.to || dateStr <= p.to)
+}
+
+export function isActivePeriod(emp, dateStr, periodiDip) {
+  const periodi = periodiDip[emp]
   if (!periodi || periodi.length === 0) return true
-  return periodi.some(p => (!p.from || dateStr >= p.from) && (!p.to || dateStr <= p.to))
+  if (periodi.some(p => p.modo === 'assente' && coversDate(p, dateStr))) return false
+  const attivi = periodi.filter(p => p.modo !== 'assente')
+  if (attivi.length === 0) return true
+  return attivi.some(p => coversDate(p, dateStr))
 }
 
 export const EMPLOYEES = [
