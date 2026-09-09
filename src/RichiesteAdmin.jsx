@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabase'
-import { EMPLOYEES } from './utils'
 import styles from './RichiesteAdmin.module.css'
 
 const DOW = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab']
@@ -28,7 +27,7 @@ function fmtRichiestaDate(iso) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
 }
 
-export default function RichiesteAdmin({ onPendingCountChange }) {
+export default function RichiesteAdmin({ onPendingCountChange, employees }) {
   const [richieste, setRichieste] = useState([])
   const [richiesteAssenza, setRichiesteAssenza] = useState([])
   const [richiesteVerbali, setRichiesteVerbali] = useState([])
@@ -500,7 +499,7 @@ export default function RichiesteAdmin({ onPendingCountChange }) {
                 onChange={e => setNewVerbale(prev => ({ ...prev, nome_dipendente: e.target.value }))}
               >
                 <option value="">Dipendente...</option>
-                {EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                {employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}
               </select>
               <input
                 type="date"

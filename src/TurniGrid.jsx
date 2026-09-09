@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 import {
-  EMPLOYEES, DOW_LABELS, getMonday, addDays, toDateStr,
+  DOW_LABELS, getMonday, addDays, toDateStr,
   formatDateVertical, isWeekend, isSunday, getWeekDays, shiftToDisplay, isActivePeriod
 } from './utils'
 import Statistiche from './Statistiche.jsx'
@@ -56,8 +56,10 @@ function darken(hex, amount) {
   return `rgb(${r},${g},${b})`
 }
 
+function empColor(ei) { return EMP_COLORS[ei % EMP_COLORS.length] }
+
 function cellBg(ei, d) {
-  const base = EMP_COLORS[ei].bg
+  const base = empColor(ei).bg
   if (isSunday(d)) return darken(base, 20)
   if (isWeekend(d)) return darken(base, 10)
   return base
@@ -76,6 +78,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const [showAssenza, setShowAssenza] = useState(false)
   const [showGenera, setShowGenera] = useState(false)
   const [showDipendentiConfig, setShowDipendentiConfig] = useState(false)
+  const [employees, setEmployees] = useState([]) // elenco nomi, ordinato, da tabella "dipendenti"
   const [periodiDip, setPeriodiDip] = useState({}) // { [dipendente]: [{from,to,modo}, ...] }
   const [cutoffConfig, setCutoffConfig] = useState({ data: '', messaggio: '' })
   const [cutoffSaveStatus, setCutoffSaveStatus] = useState('') // '' | 'ok' | 'err'
@@ -160,6 +163,18 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   }, [])
 
   useEffect(() => { loadPeriodiDip() }, [loadPeriodiDip])
+
+  // Carica l'elenco dipendenti (gestibile in "⚙️ Impostazioni dipendenti").
+  // Riguarda tutti i visualizzatori, non solo l'admin.
+  const loadEmployees = useCallback(async () => {
+    const { data } = await supabase
+      .from('dipendenti')
+      .select('nome')
+      .order('ordine', { ascending: true })
+    setEmployees((data || []).map(r => r.nome))
+  }, [])
+
+  useEffect(() => { loadEmployees() }, [loadEmployees])
 
   const loadData = useCallback(async () => {
     setSyncStatus({ msg: 'Caricamento...', cls: '' })
@@ -372,7 +387,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   // Filtra dipendenti attivi per la settimana visualizzata: la riga resta
   // visibile se il dipendente è attivo in almeno un giorno della settimana
   // (nessun periodo configurato = sempre visibile).
-  const visibleEmployees = EMPLOYEES.filter(emp =>
+  const visibleEmployees = employees.filter(emp =>
     days.some(d => isActivePeriod(emp, toDateStr(d), periodiDip))
   )
 
@@ -425,9 +440,9 @@ export default function TurniGrid({ isAdmin, onLogout }) {
         </div>
       )}
 
-      {tab === 'statistiche' && isAdmin && <Statistiche data={data} />}
+      {tab === 'statistiche' && isAdmin && <Statistiche data={data} employees={employees} />}
 
-      {tab === 'richieste' && isAdmin && <RichiesteAdmin onPendingCountChange={handlePendingCountChange} />}
+      {tab === 'richieste' && isAdmin && <RichiesteAdmin onPendingCountChange={handlePendingCountChange} employees={employees} />}
 
       {tab === 'figure' && isAdmin && <FigureTab />}
 
@@ -505,7 +520,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                           <td
                             className={styles.colName}
                             rowSpan={2}
-                            style={{ backgroundColor: EMP_COLORS[ei].bg, borderLeft: `4px solid ${EMP_COLORS[ei].border}` }}
+                            style={{ backgroundColor: empColor(ei).bg, borderLeft: `4px solid ${empColor(ei).border}` }}
                           >
                             <div className={styles.nameWrap}>
                               <span>{emp}</span>
@@ -655,12 +670,13 @@ export default function TurniGrid({ isAdmin, onLogout }) {
         </>
       )}
 
-      {showExport && <ExportModal data={data} currentMonday={currentMonday} onClose={() => setShowExport(false)} />}
-      {showFerie && <FerieModal currentMonday={currentMonday} onClose={() => setShowFerie(false)} onApply={applyFerie} />}
-      {showCambio && <RichiestaCambioModal data={data} onClose={() => setShowCambio(false)} />}
-      {showAssenza && <RichiestaAssenzaModal onClose={() => setShowAssenza(false)} />}
+      {showExport && <ExportModal data={data} currentMonday={currentMonday} employees={employees} onClose={() => setShowExport(false)} />}
+      {showFerie && <FerieModal currentMonday={currentMonday} employees={employees} onClose={() => setShowFerie(false)} onApply={applyFerie} />}
+      {showCambio && <RichiestaCambioModal data={data} employees={employees} onClose={() => setShowCambio(false)} />}
+      {showAssenza && <RichiestaAssenzaModal employees={employees} onClose={() => setShowAssenza(false)} />}
       {showGenera && (
         <GeneraTurniModal
+          employees={employees}
           onClose={() => setShowGenera(false)}
           onApply={() => { setShowGenera(false); loadData() }}
         />
@@ -668,7 +684,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
       {showDipendentiConfig && (
         <DipendentiConfigModal
           onClose={() => setShowDipendentiConfig(false)}
-          onSaved={loadPeriodiDip}
+          onSaved={() => { loadPeriodiDip(); loadEmployees() }}
         />
       )}
     </div>

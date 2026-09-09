@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { EMPLOYEES, getMonday, addDays, toDateStr, isActivePeriod } from './utils'
+import { getMonday, addDays, toDateStr, isActivePeriod } from './utils'
 import { generaTurni } from './generaTurni'
 import styles from './GeneraTurniModal.module.css'
 
@@ -37,7 +37,7 @@ function countWeeks(fromStr, toStr) {
   return Math.max(1, Math.ceil((to - from) / (7 * 86400000)) + 1)
 }
 
-export default function GeneraTurniModal({ onClose, onApply }) {
+export default function GeneraTurniModal({ employees, onClose, onApply }) {
   const today = toDateStr(new Date())
   const defaultTo = toDateStr(addDays(new Date(), 27))
 
@@ -46,7 +46,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
 
   const [startingPos, setStartingPos] = useState(() => {
     const obj = {}
-    EMPLOYEES.forEach((emp, i) => { obj[emp] = i + 1 })
+    employees.forEach((emp, i) => { obj[emp] = i + 1 })
     return obj
   })
 
@@ -148,13 +148,13 @@ export default function GeneraTurniModal({ onClose, onApply }) {
   }
 
   function buildStartingOrder() {
-    return [...EMPLOYEES].sort((a, b) => startingPos[a] - startingPos[b])
+    return [...employees].sort((a, b) => startingPos[a] - startingPos[b])
   }
 
   function addIndisponibilita() {
     setIndisponibilita(prev => [...prev, {
       id: Date.now(),
-      emp: EMPLOYEES[0],
+      emp: employees[0],
       from: today,
       to: today
     }])
@@ -209,7 +209,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
 
   const previewStats = preview ? (() => {
     const byEmp = {}
-    EMPLOYEES.forEach(e => { byEmp[e] = 0 })
+    employees.forEach(e => { byEmp[e] = 0 })
     preview.toUpsert.forEach(r => {
       const emp = r.key.split('::')[0]
       if (byEmp[emp] !== undefined) byEmp[emp]++
@@ -256,6 +256,9 @@ export default function GeneraTurniModal({ onClose, onApply }) {
                 Turno sabato iniziale
                 <span className={styles.labelHint}>— turno di ciascun dipendente nel primo sabato del periodo</span>
               </label>
+              {employees.length > 7 && (
+                <div className={styles.warning}>I turni cena vanno da 1 a 7: con {employees.length} dipendenti la generazione automatica non può assegnare una posizione univoca a tutti. Rimuovi un dipendente o compila questa settimana a mano.</div>
+              )}
               {duplicates && (
                 <div className={styles.warning}>Turni duplicati: ogni dipendente deve avere un turno diverso (1–7).</div>
               )}
@@ -266,7 +269,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
                   <span>Dom</span>
                   <span>Note</span>
                 </div>
-                {EMPLOYEES.map(emp => {
+                {employees.map(emp => {
                   const satT = startingPos[emp]
                   const sunT = 7 - satT
                   const isLast = satT === 6 || satT === 7
@@ -326,7 +329,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
                     value={entry.emp}
                     onChange={e => updateIndisp(entry.id, 'emp', e.target.value)}
                   >
-                    {EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                    {employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}
                   </select>
                   <span className={styles.indispLabel}>dal</span>
                   <input type="date" className={styles.indispDate} value={entry.from} onChange={e => updateIndisp(entry.id, 'from', e.target.value)} />
@@ -344,7 +347,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
             <button
               className={styles.primaryBtn}
               onClick={handlePreview}
-              disabled={duplicates || !from || !to}
+              disabled={duplicates || !from || !to || employees.length > 7}
             >
               Anteprima →
             </button>
@@ -356,7 +359,7 @@ export default function GeneraTurniModal({ onClose, onApply }) {
             <div className={styles.section}>
               <label className={styles.label}>Riepilogo generazione</label>
               <div className={styles.previewGrid}>
-                {EMPLOYEES.map(emp => (
+                {employees.map(emp => (
                   <div key={emp} className={styles.previewRow}>
                     <span className={styles.previewEmp}>{emp}</span>
                     <span className={styles.previewCount}>{previewStats[emp]} celle</span>

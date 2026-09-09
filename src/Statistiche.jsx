@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { EMPLOYEES, PRANZO_MAP, CENA_MAP } from './utils'
+import { PRANZO_MAP, CENA_MAP } from './utils'
 import styles from './Statistiche.module.css'
 
 const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
@@ -23,7 +23,7 @@ function dateInRange(dateStr, from, to) {
 
 function pad(n) { return String(n).padStart(2, '0') }
 
-export default function Statistiche({ data }) {
+export default function Statistiche({ data, employees }) {
   const now = new Date()
   const [mode, setMode] = useState('settimana') // settimana | mese | anno | custom
   const [selWeek, setSelWeek] = useState(() => {
@@ -58,7 +58,7 @@ export default function Statistiche({ data }) {
   }, [mode, selWeek, selMonth, selYear, selYearOnly, customFrom, customTo])
 
   const stats = useMemo(() => {
-    return EMPLOYEES.map(emp => {
+    return employees.map(emp => {
       let pranzo = 0, cena = 0
       Object.entries(data).forEach(([key, val]) => {
         const parsed = parseKey(key)
@@ -71,7 +71,7 @@ export default function Statistiche({ data }) {
       })
       return { emp, pranzo, cena, totale: pranzo + cena }
     })
-  }, [data, from, to])
+  }, [data, from, to, employees])
 
   const totals = useMemo(() => ({
     pranzo: stats.reduce((s, r) => s + r.pranzo, 0),

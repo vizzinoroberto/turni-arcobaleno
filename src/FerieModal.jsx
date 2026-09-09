@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EMPLOYEES, addDays, toDateStr } from './utils'
+import { addDays, toDateStr } from './utils'
 import styles from './FerieModal.module.css'
 
 function pad(n) { return String(n).padStart(2,'0') }
@@ -8,7 +8,7 @@ function fmtDate(str) {
   return `${d}/${m}/${String(y).slice(2)}`
 }
 
-export default function FerieModal({ currentMonday, onClose, onApply }) {
+export default function FerieModal({ currentMonday, employees: allEmployees, onClose, onApply }) {
   const monStr = toDateStr(currentMonday)
   const sunStr = toDateStr(addDays(currentMonday, 6))
 
@@ -30,7 +30,7 @@ export default function FerieModal({ currentMonday, onClose, onApply }) {
     if (m === 'settimana') { setFrom(monStr); setTo(sunStr) }
   }
 
-  const employees = empMode === 'tutti' ? EMPLOYEES : selEmps
+  const employees = empMode === 'tutti' ? allEmployees : selEmps
 
   function countDays() {
     let count = 0
@@ -108,7 +108,7 @@ export default function FerieModal({ currentMonday, onClose, onApply }) {
           </div>
           {empMode === 'singoli' && (
             <div className={styles.empList}>
-              {EMPLOYEES.map(emp => (
+              {allEmployees.map(emp => (
                 <label key={emp} className={styles.empCheck}>
                   <input
                     type="checkbox"

@@ -36,15 +36,9 @@ export function isActivePeriod(emp, dateStr, periodiDip) {
   return attivi.some(p => coversDate(p, dateStr))
 }
 
-export const EMPLOYEES = [
-  'Francesca Novello',
-  'Benedetta Pagliarusco',
-  'Giulia Nascinguerra',
-  'Aurora Nascinguerra',
-  'Sara Tondo',
-  'Ilaria Pontarollo',
-  'Nicole Cavalli',
-]
+// L'elenco dipendenti non è più statico: viene caricato dalla tabella
+// Supabase "dipendenti" (gestibile da "⚙️ Impostazioni dipendenti") e passato
+// come prop "employees" da TurniGrid a tutti i componenti che ne hanno bisogno.
 
 export const DOW_LABELS = ['D', 'L', 'M', 'M', 'G', 'V', 'S']
 

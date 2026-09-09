@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import { EMPLOYEES } from './utils'
 import styles from './DipendentiConfigModal.module.css'
 
 const GIORNI = [
@@ -19,14 +18,22 @@ let localIdSeq = 0
 function localId() { return `new-${Date.now()}-${localIdSeq++}` }
 
 export default function DipendentiConfigModal({ onClose, onSaved }) {
+  const [dipendenti, setDipendenti] = useState([]) // [{ id, nome }] — id è solo una chiave locale
+  const [dipSaving, setDipSaving] = useState(false)
+  const [dipSaveStatus, setDipSaveStatus] = useState('') // '' | 'ok' | 'err' | 'dup' | 'empty'
   const [turniFissi, setTurniFissi] = useState([])
   const [periodi, setPeriodi] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState('') // '' | 'ok' | 'err'
 
+  const employeeNames = dipendenti.map(d => d.nome.trim()).filter(Boolean)
+
   useEffect(() => {
-    supabase.from('dipendenti_config').select('*').then(({ data }) => {
+    Promise.all([
+      supabase.from('dipendenti_config').select('*'),
+      supabase.from('dipendenti').select('nome').order('ordine', { ascending: true }),
+    ]).then(([{ data }, { data: dipData }]) => {
       const rows = data || []
       setTurniFissi(
         rows.filter(r => r.tipo === 'turno_fisso').map(r => ({
@@ -47,12 +54,49 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
           to: r.data_fine || '',
         }))
       )
+      setDipendenti((dipData || []).map(r => ({ id: localId(), nome: r.nome })))
       setLoading(false)
     })
   }, [])
 
+  function addDipendente() {
+    setDipendenti(prev => [...prev, { id: localId(), nome: '' }])
+  }
+  function updateDipendente(id, nome) {
+    setDipendenti(prev => prev.map(d => d.id === id ? { ...d, nome } : d))
+    setDipSaveStatus('')
+  }
+  function removeDipendente(id) {
+    setDipendenti(prev => prev.filter(d => d.id !== id))
+    setDipSaveStatus('')
+  }
+
+  async function handleSaveDipendenti() {
+    const nomi = dipendenti.map(d => d.nome.trim()).filter(Boolean)
+    if (nomi.length === 0) { setDipSaveStatus('empty'); return }
+    if (new Set(nomi).size !== nomi.length) { setDipSaveStatus('dup'); return }
+
+    setDipSaving(true)
+    setDipSaveStatus('')
+
+    // Sostituzione completa, come per dipendenti_config: tabella piccola,
+    // gestita solo da qui.
+    const { error: delError } = await supabase.from('dipendenti').delete().not('nome', 'is', null)
+    if (delError) { setDipSaving(false); setDipSaveStatus('err'); return }
+
+    const { error: insError } = await supabase.from('dipendenti').insert(
+      nomi.map((nome, i) => ({ nome, ordine: i }))
+    )
+    if (insError) { setDipSaving(false); setDipSaveStatus('err'); return }
+
+    setDipendenti(nomi.map(nome => ({ id: localId(), nome })))
+    setDipSaving(false)
+    setDipSaveStatus('ok')
+    if (onSaved) onSaved()
+  }
+
   function addTurnoFisso() {
-    setTurniFissi(prev => [...prev, { id: localId(), emp: EMPLOYEES[0], giorni: [], turno: '5', from: '', to: '' }])
+    setTurniFissi(prev => [...prev, { id: localId(), emp: employeeNames[0] || '', giorni: [], turno: '5', from: '', to: '' }])
   }
   function updateTurnoFisso(id, field, value) {
     setTurniFissi(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
@@ -69,7 +113,7 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
   }
 
   function addPeriodo() {
-    setPeriodi(prev => [...prev, { id: localId(), emp: EMPLOYEES[0], modo: 'assente', from: '', to: '' }])
+    setPeriodi(prev => [...prev, { id: localId(), emp: employeeNames[0] || '', modo: 'assente', from: '', to: '' }])
   }
   function updatePeriodo(id, field, value) {
     setPeriodi(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
@@ -133,6 +177,40 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <label className={styles.label}>
+                  Dipendenti
+                  <span className={styles.labelHint}>— elenco di chi compare in griglia, statistiche, richieste ed export. Rimuovere un nome lo nasconde ovunque ma non cancella i turni già salvati con quel nome.</span>
+                </label>
+                <button className={styles.addBtn} onClick={addDipendente}>+ Aggiungi</button>
+              </div>
+              {dipendenti.length === 0 && (
+                <span className={styles.emptyHint}>Nessun dipendente configurato.</span>
+              )}
+              {dipendenti.map(d => (
+                <div key={d.id} className={styles.ruleRow}>
+                  <input
+                    type="text"
+                    className={styles.empNameInput}
+                    placeholder="Nome e cognome"
+                    value={d.nome}
+                    onChange={e => updateDipendente(d.id, e.target.value)}
+                  />
+                  <button className={styles.removeBtn} onClick={() => removeDipendente(d.id)}>✕</button>
+                </div>
+              ))}
+              <div className={styles.saveRow}>
+                <button className={styles.saveBtn} onClick={handleSaveDipendenti} disabled={dipSaving}>
+                  {dipSaving ? 'Salvataggio...' : 'Salva dipendenti'}
+                </button>
+                {dipSaveStatus === 'ok' && <span className={styles.saveOk}>✓ OK, salvato</span>}
+                {dipSaveStatus === 'err' && <span className={styles.saveErr}>✗ Errore, riprova</span>}
+                {dipSaveStatus === 'dup' && <span className={styles.saveErr}>✗ Nomi duplicati</span>}
+                {dipSaveStatus === 'empty' && <span className={styles.saveErr}>✗ Serve almeno un dipendente</span>}
+              </div>
+            </div>
+
+            <div className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <label className={styles.label}>
                   Turni fissi
                   <span className={styles.labelHint}>— dipendente in turno cena fisso in certi giorni e periodo (es. Novello mar/mer/ven in estate)</span>
                 </label>
@@ -145,7 +223,7 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
                 <div key={r.id} className={styles.ruleCard}>
                   <div className={styles.ruleRow}>
                     <select className={styles.empSelect} value={r.emp} onChange={e => updateTurnoFisso(r.id, 'emp', e.target.value)}>
-                      {EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                      {employeeNames.map(emp => <option key={emp} value={emp}>{emp}</option>)}
                     </select>
                     <span className={styles.ruleLabel}>turno cena</span>
                     <select className={styles.turnoSelect} value={r.turno} onChange={e => updateTurnoFisso(r.id, 'turno', e.target.value)}>
@@ -193,7 +271,7 @@ export default function DipendentiConfigModal({ onClose, onSaved }) {
               {periodi.map(r => (
                 <div key={r.id} className={styles.ruleRow}>
                   <select className={styles.empSelect} value={r.emp} onChange={e => updatePeriodo(r.id, 'emp', e.target.value)}>
-                    {EMPLOYEES.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                    {employeeNames.map(emp => <option key={emp} value={emp}>{emp}</option>)}
                   </select>
                   <select className={styles.modoSelect} value={r.modo} onChange={e => updatePeriodo(r.id, 'modo', e.target.value)}>
                     <option value="assente">assente</option>

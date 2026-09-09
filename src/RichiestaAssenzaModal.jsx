@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { supabase } from './supabase'
-import { EMPLOYEES, toDateStr } from './utils'
+import { toDateStr } from './utils'
 import styles from './RichiestaCambioModal.module.css'
 
-export default function RichiestaAssenzaModal({ onClose }) {
+export default function RichiestaAssenzaModal({ employees, onClose }) {
   const [nome, setNome] = useState('')
   const [dataInizio, setDataInizio] = useState('')
   const [dataFine, setDataFine] = useState('')
@@ -70,7 +70,7 @@ export default function RichiestaAssenzaModal({ onClose }) {
               <label className={styles.label}>Il tuo nome *</label>
               <select className={styles.select} value={nome} onChange={e => setNome(e.target.value)}>
                 <option value="">— Seleziona il tuo nome —</option>
-                {EMPLOYEES.map(e => <option key={e} value={e}>{e}</option>)}
+                {employees.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
 

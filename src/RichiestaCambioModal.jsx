@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { supabase } from './supabase'
-import { EMPLOYEES, addDays, toDateStr, getMonday, formatDateVertical, getWeekDays } from './utils'
+import { addDays, toDateStr, getMonday, formatDateVertical, getWeekDays } from './utils'
 import styles from './RichiestaCambioModal.module.css'
 
 const DOW = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab']
@@ -11,7 +11,7 @@ function fmtSlot(dateStr, service) {
   return `${DOW[date.getDay()]} ${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')} - ${service === 'pranzo' ? 'Pranzo' : 'Cena'}`
 }
 
-export default function RichiestaCambioModal({ data, onClose }) {
+export default function RichiestaCambioModal({ data, employees, onClose }) {
   const [nome, setNome] = useState('')
   const [tipo, setTipo] = useState('scambio') // 'scambio' | 'cessione'
   const [dataCedo, setDataCedo] = useState('')
@@ -115,7 +115,7 @@ export default function RichiestaCambioModal({ data, onClose }) {
                 onChange={e => setNome(e.target.value)}
               >
                 <option value="">— Seleziona il tuo nome —</option>
-                {EMPLOYEES.map(e => (
+                {employees.map(e => (
                   <option key={e} value={e}>{e}</option>
                 ))}
               </select>
@@ -172,7 +172,7 @@ export default function RichiestaCambioModal({ data, onClose }) {
                 onChange={e => { setCollega(e.target.value); setDataCollega(''); setServizioCollega('cena') }}
               >
                 <option value="">— Seleziona collega —</option>
-                {EMPLOYEES.filter(e => e !== nome.trim()).map(e => (
+                {employees.filter(e => e !== nome.trim()).map(e => (
                   <option key={e} value={e}>{e}</option>
                 ))}
               </select>

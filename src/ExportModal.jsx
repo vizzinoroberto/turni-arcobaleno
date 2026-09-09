@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EMPLOYEES, PRANZO_MAP, CENA_MAP, addDays, toDateStr } from './utils'
+import { PRANZO_MAP, CENA_MAP, addDays, toDateStr } from './utils'
 import styles from './ExportModal.module.css'
 
 function pad(n) { return String(n).padStart(2,'0') }
@@ -303,7 +303,7 @@ async function buildAndDownloadICS(data, from, to, employees) {
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
-export default function ExportModal({ data, currentMonday, onClose }) {
+export default function ExportModal({ data, currentMonday, employees, onClose }) {
   const monStr = localDateStr(currentMonday)
   const sunStr = localDateStr(addDays(currentMonday, 6))
 
@@ -311,9 +311,9 @@ export default function ExportModal({ data, currentMonday, onClose }) {
   const [from, setFrom] = useState(monStr)
   const [to, setTo] = useState(sunStr)
   const [empMode, setEmpMode] = useState('uno')
-  const [selEmp, setSelEmp] = useState(EMPLOYEES[0])
+  const [selEmp, setSelEmp] = useState(employees[0])
 
-  function getEmployees() { return empMode === 'tutti' ? EMPLOYEES : [selEmp] }
+  function getEmployees() { return empMode === 'tutti' ? employees : [selEmp] }
 
   function handleModeChange(m) {
     setMode(m)
@@ -372,7 +372,7 @@ export default function ExportModal({ data, currentMonday, onClose }) {
           </div>
           {empMode === 'uno' && (
             <select className={styles.empSel} value={selEmp} onChange={e => setSelEmp(e.target.value)}>
-              {EMPLOYEES.map(e => <option key={e} value={e}>{e}</option>)}
+              {employees.map(e => <option key={e} value={e}>{e}</option>)}
             </select>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { EMPLOYEES, getMonday, addDays, toDateStr, getWeekDays, isFestivo, isSummer, isActivePeriod } from './utils'
+import { getMonday, addDays, toDateStr, getWeekDays, isFestivo, isSummer, isActivePeriod } from './utils'
 
 const FRANCESCA = 'Francesca Novello'
 
@@ -142,8 +142,9 @@ export function generaTurni(fromDate, toDate, startingOrder, figureAssenzePerSet
         if (pranzoW && !excl(pranzoW)) pranzo[pranzoW] = 'W'
       }
 
-      // Emetti record per tutti i dipendenti
-      EMPLOYEES.forEach(emp => {
+      // Emetti record per tutti i dipendenti (startingOrder è una permutazione
+      // dell'intero elenco, non solo dei rotanti nel weekend)
+      startingOrder.forEach(emp => {
         const cKey = `${emp}::${ds}::cena`
         const pKey = `${emp}::${ds}::pranzo`
         if (cena[emp] !== undefined) toUpsert.push({ key: cKey, val: cena[emp] })
