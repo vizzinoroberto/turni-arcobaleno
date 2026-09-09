@@ -98,8 +98,9 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
   const dayW = available / dates.length
   const subW = dayW / 2
 
-  const headRow1 = ['Dipendente', ...dates.flatMap(d => [`${fmtDate(d)} ${DOW_IT[d.getDay()]}`, ''])]
-  const headRow2 = ['', ...dates.flatMap(() => ['P', 'C'])]
+  const headRow1 = ['Dipendente', ...dates.map(d => ({ content: fmtDate(d), colSpan: 2 }))]
+  const headRow2 = ['', ...dates.map(d => ({ content: DOW_IT[d.getDay()], colSpan: 2 }))]
+  const headRow3 = ['', ...dates.flatMap(() => ['P', 'C'])]
 
   const body = employees.map((emp) => {
     const row = [emp]
@@ -125,7 +126,7 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
 
   doc.autoTable({
     startY,
-    head: [headRow1, headRow2],
+    head: [headRow1, headRow2, headRow3],
     body,
     columnStyles,
     styles: { fontSize: 7.5, cellPadding: 1.8, valign: 'middle', overflow: 'hidden' },
@@ -143,7 +144,7 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
           hookData.cell.styles.fontSize = 6.5
         }
       }
-      if (hookData.section === 'head' && hookData.row.index === 0 && hookData.column.index >= 1) {
+      if (hookData.section === 'head' && (hookData.row.index === 0 || hookData.row.index === 1) && hookData.column.index >= 1) {
         const dateIdx = Math.floor((hookData.column.index - 1) / 2)
         if (dateIdx < dates.length) {
           const dow = dates[dateIdx].getDay()
