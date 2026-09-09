@@ -16,6 +16,12 @@ import DipendentiConfigModal from './DipendentiConfigModal.jsx'
 import styles from './TurniGrid.module.css'
 import { FESTIVI } from './utils'
 
+// DEBUG TEMPORANEO: traccia gli eventi sulle select turni per individuare la
+// causa delle cancellazioni impreviste segnalate. Da rimuovere a fix confermata.
+function logDebug(payload) {
+  supabase.from('debug_log').insert({ payload }).then(() => {})
+}
+
 const EMP_COLORS = [
   { bg: '#DBEAFE', border: '#93C5FD' },
   { bg: '#D1FAE5', border: '#6EE7B7' },
@@ -567,8 +573,26 @@ export default function TurniGrid({ isAdmin, onLogout }) {
                                 <select
                                   className={selectClass(val)}
                                   value={val}
-                                  onChange={e => { handleChange(key, e.target.value); e.target.blur() }}
-                                  onWheel={e => e.target.blur()}
+                                  onChange={e => {
+                                    const newVal = e.target.value
+                                    logDebug({
+                                      t: newVal ? 'change' : 'change-empty',
+                                      key, prevVal: val, newVal,
+                                      isTrusted: e.nativeEvent && e.nativeEvent.isTrusted,
+                                      active: document.activeElement === e.target,
+                                      ts: Date.now(),
+                                    })
+                                    handleChange(key, newVal)
+                                    e.target.blur()
+                                  }}
+                                  onWheel={e => {
+                                    logDebug({
+                                      t: 'wheel', key, val, deltaY: e.deltaY,
+                                      active: document.activeElement === e.target,
+                                      ts: Date.now(),
+                                    })
+                                    e.target.blur()
+                                  }}
                                 >
                                   {adminOptions(service, val)}
                                 </select>
