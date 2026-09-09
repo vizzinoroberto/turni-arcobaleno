@@ -23,6 +23,21 @@ function dateInRange(dateStr, from, to) {
 
 function pad(n) { return String(n).padStart(2, '0') }
 
+// Lunedì è sempre chiuso, quindi non ha senso contarlo qui.
+const DOW_COLS = [
+  { dow: 2, label: 'Mar' },
+  { dow: 3, label: 'Mer' },
+  { dow: 4, label: 'Gio' },
+  { dow: 5, label: 'Ven' },
+  { dow: 6, label: 'Sab' },
+  { dow: 0, label: 'Dom' },
+]
+
+function dowOf(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).getDay()
+}
+
 export default function Statistiche({ data, employees }) {
   const now = new Date()
   const [mode, setMode] = useState('settimana') // settimana | mese | anno | custom
@@ -58,26 +73,46 @@ export default function Statistiche({ data, employees }) {
   }, [mode, selWeek, selMonth, selYear, selYearOnly, customFrom, customTo])
 
   const stats = useMemo(() => {
+    // giorniLavorati[emp]: Set di date (una volta sola anche se pranzo+cena
+    // nello stesso giorno) — serve per contare "quanti sabato/domeniche ecc."
+    // come giorni lavorati, non come somma di turni.
+    const giorniLavorati = {}
+    const shiftCount = {}
+    employees.forEach(emp => {
+      giorniLavorati[emp] = new Set()
+      shiftCount[emp] = { pranzo: 0, cena: 0 }
+    })
+
+    Object.entries(data).forEach(([key, val]) => {
+      const parsed = parseKey(key)
+      if (!parsed || !shiftCount[parsed.emp]) return
+      if (!dateInRange(parsed.date, from, to)) return
+      if (!isValidShift(val, parsed.service)) return
+      shiftCount[parsed.emp][parsed.service]++
+      giorniLavorati[parsed.emp].add(parsed.date)
+    })
+
     return employees.map(emp => {
-      let pranzo = 0, cena = 0
-      Object.entries(data).forEach(([key, val]) => {
-        const parsed = parseKey(key)
-        if (!parsed) return
-        if (parsed.emp !== emp) return
-        if (!dateInRange(parsed.date, from, to)) return
-        if (!isValidShift(val, parsed.service)) return
-        if (parsed.service === 'pranzo') pranzo++
-        else cena++
-      })
-      return { emp, pranzo, cena, totale: pranzo + cena }
+      const { pranzo, cena } = shiftCount[emp]
+      const byDow = {}
+      DOW_COLS.forEach(({ dow }) => { byDow[dow] = 0 })
+      giorniLavorati[emp].forEach(dateStr => { byDow[dowOf(dateStr)]++ })
+      return { emp, pranzo, cena, totale: pranzo + cena, byDow }
     })
   }, [data, from, to, employees])
 
-  const totals = useMemo(() => ({
-    pranzo: stats.reduce((s, r) => s + r.pranzo, 0),
-    cena: stats.reduce((s, r) => s + r.cena, 0),
-    totale: stats.reduce((s, r) => s + r.totale, 0),
-  }), [stats])
+  const totals = useMemo(() => {
+    const byDow = {}
+    DOW_COLS.forEach(({ dow }) => {
+      byDow[dow] = stats.reduce((s, r) => s + r.byDow[dow], 0)
+    })
+    return {
+      pranzo: stats.reduce((s, r) => s + r.pranzo, 0),
+      cena: stats.reduce((s, r) => s + r.cena, 0),
+      totale: stats.reduce((s, r) => s + r.totale, 0),
+      byDow,
+    }
+  }, [stats])
 
   const years = []
   for (let y = 2024; y <= now.getFullYear() + 1; y++) years.push(y)
@@ -165,6 +200,38 @@ export default function Statistiche({ data, employees }) {
               <td className={styles.td}><strong>{totals.pranzo}</strong></td>
               <td className={styles.td}><strong>{totals.cena}</strong></td>
               <td className={`${styles.td} ${styles.tdTotal}`}><strong>{totals.totale}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div className={styles.sectionTitle}>Giorni lavorati per giorno della settimana</div>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th className={styles.thName}>Dipendente</th>
+              {DOW_COLS.map(({ dow, label }) => <th key={dow} className={styles.th}>{label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {stats.map(({ emp, byDow }) => (
+              <tr key={emp} className={styles.tr}>
+                <td className={styles.tdName}>{emp}</td>
+                {DOW_COLS.map(({ dow }) => (
+                  <td key={dow} className={styles.td}>
+                    {byDow[dow] > 0 ? byDow[dow] : <span className={styles.zero}>—</span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className={styles.tfootRow}>
+              <td className={styles.tdName}><strong>Totale</strong></td>
+              {DOW_COLS.map(({ dow }) => (
+                <td key={dow} className={styles.td}><strong>{totals.byDow[dow]}</strong></td>
+              ))}
             </tr>
           </tfoot>
         </table>

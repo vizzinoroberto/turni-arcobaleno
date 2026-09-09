@@ -79,6 +79,13 @@
   background: #fff;
 }
 
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  margin: 20px 0 8px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
