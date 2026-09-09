@@ -33,9 +33,27 @@ const DOW_COLS = [
   { dow: 0, label: 'Dom' },
 ]
 
-function dowOf(dateStr) {
+function parseYMD(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d).getDay()
+  return new Date(y, m - 1, d)
+}
+
+function dowOf(dateStr) {
+  return parseYMD(dateStr).getDay()
+}
+
+// Conta quante volte cade il giorno "dow" nell'intervallo [fromStr, toStr]
+// (inclusi entrambi gli estremi) — usato per sapere quanti sabati/domeniche
+// ci sono in totale nel periodo, indipendentemente da chi lavora.
+function countDowInRange(dow, fromStr, toStr) {
+  let count = 0
+  const cur = parseYMD(fromStr)
+  const end = parseYMD(toStr)
+  while (cur <= end) {
+    if (cur.getDay() === dow) count++
+    cur.setDate(cur.getDate() + 1)
+  }
+  return count
 }
 
 export default function Statistiche({ data, employees }) {
@@ -113,6 +131,26 @@ export default function Statistiche({ data, employees }) {
       byDow,
     }
   }, [stats])
+
+  // Sabati e domeniche totali nel periodo selezionato (indipendenti dal
+  // dipendente), per calcolare quanti NON ne ha lavorati per differenza.
+  const { totSabati, totDomeniche } = useMemo(() => ({
+    totSabati: countDowInRange(6, from, to),
+    totDomeniche: countDowInRange(0, from, to),
+  }), [from, to])
+
+  const weekendOff = useMemo(() => {
+    return stats.map(({ emp, byDow }) => ({
+      emp,
+      sab: Math.max(0, totSabati - byDow[6]),
+      dom: Math.max(0, totDomeniche - byDow[0]),
+    }))
+  }, [stats, totSabati, totDomeniche])
+
+  const weekendOffTotals = useMemo(() => ({
+    sab: weekendOff.reduce((s, r) => s + r.sab, 0),
+    dom: weekendOff.reduce((s, r) => s + r.dom, 0),
+  }), [weekendOff])
 
   const years = []
   for (let y = 2024; y <= now.getFullYear() + 1; y++) years.push(y)
@@ -232,6 +270,38 @@ export default function Statistiche({ data, employees }) {
               {DOW_COLS.map(({ dow }) => (
                 <td key={dow} className={styles.td}><strong>{totals.byDow[dow]}</strong></td>
               ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div className={styles.sectionTitle}>
+        Sabati e domeniche NON lavorati
+        <span className={styles.sectionHint}> — su {totSabati} sabat{totSabati === 1 ? 'o' : 'i'} e {totDomeniche} domenic{totDomeniche === 1 ? 'a' : 'he'} nel periodo</span>
+      </div>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th className={styles.thName}>Dipendente</th>
+              <th className={styles.th}>Sab</th>
+              <th className={styles.th}>Dom</th>
+            </tr>
+          </thead>
+          <tbody>
+            {weekendOff.map(({ emp, sab, dom }) => (
+              <tr key={emp} className={styles.tr}>
+                <td className={styles.tdName}>{emp}</td>
+                <td className={styles.td}>{sab > 0 ? sab : <span className={styles.zero}>—</span>}</td>
+                <td className={styles.td}>{dom > 0 ? dom : <span className={styles.zero}>—</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className={styles.tfootRow}>
+              <td className={styles.tdName}><strong>Totale</strong></td>
+              <td className={styles.td}><strong>{weekendOffTotals.sab}</strong></td>
+              <td className={styles.td}><strong>{weekendOffTotals.dom}</strong></td>
             </tr>
           </tfoot>
         </table>
