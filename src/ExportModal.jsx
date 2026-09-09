@@ -93,6 +93,8 @@ function buildAndDownloadXLS(data, from, to, employees) {
 }
 
 // ── PDF ───────────────────────────────────────────────────────────────────────
+const DAY_BORDER_WIDTH = 0.6
+
 function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nameColW) {
   const available = pageW - margin * 2 - nameColW
   const dayW = available / dates.length
@@ -118,10 +120,13 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
     return row
   })
 
-  const columnStyles = { 0: { cellWidth: nameColW, halign: 'left', fontStyle: 'bold' } }
+  // Bordo destro nero per separare visivamente un giorno dal successivo (e il
+  // nome dipendente dal primo giorno) — solo verticale, niente griglia interna.
+  const dayBorder = { lineWidth: { top: 0, right: DAY_BORDER_WIDTH, bottom: 0, left: 0 }, lineColor: [0, 0, 0] }
+  const columnStyles = { 0: { cellWidth: nameColW, halign: 'left', fontStyle: 'bold', ...dayBorder } }
   dates.forEach((_, di) => {
     columnStyles[1 + di*2]     = { cellWidth: subW, halign: 'center' }
-    columnStyles[1 + di*2 + 1] = { cellWidth: subW, halign: 'center' }
+    columnStyles[1 + di*2 + 1] = { cellWidth: subW, halign: 'center', ...dayBorder }
   })
 
   doc.autoTable({
@@ -175,6 +180,12 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
       doc.text(timeStr, x + width / 2, y + height / 2 - 0.6, { align: 'center', baseline: 'middle' })
       doc.setFontSize(5)
       doc.text(turnoStr, x + width / 2, y + height - 1.3, { align: 'center', baseline: 'alphabetic' })
+
+      // Il repaint della cella copre il bordo destro (separatore tra giorni):
+      // lo ridisegna sopra.
+      doc.setDrawColor(0, 0, 0)
+      doc.setLineWidth(DAY_BORDER_WIDTH)
+      doc.line(x + width, y, x + width, y + height)
     },
     margin: { left: margin, right: margin },
   })
