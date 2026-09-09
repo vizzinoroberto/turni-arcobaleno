@@ -670,7 +670,7 @@ export default function TurniGrid({ isAdmin, onLogout }) {
         </>
       )}
 
-      {showExport && <ExportModal data={data} currentMonday={currentMonday} employees={employees} onClose={() => setShowExport(false)} />}
+      {showExport && <ExportModal data={data} currentMonday={currentMonday} employees={employees} periodiDip={periodiDip} onClose={() => setShowExport(false)} />}
       {showFerie && <FerieModal currentMonday={currentMonday} employees={employees} onClose={() => setShowFerie(false)} onApply={applyFerie} />}
       {showCambio && <RichiestaCambioModal data={data} employees={employees} onClose={() => setShowCambio(false)} />}
       {showAssenza && <RichiestaAssenzaModal employees={employees} onClose={() => setShowAssenza(false)} />}

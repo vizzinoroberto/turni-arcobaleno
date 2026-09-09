@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PRANZO_MAP, CENA_MAP, addDays, toDateStr } from './utils'
+import { PRANZO_MAP, CENA_MAP, addDays, toDateStr, isActivePeriod } from './utils'
 import styles from './ExportModal.module.css'
 
 function pad(n) { return String(n).padStart(2,'0') }
@@ -106,7 +106,13 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
     dates.forEach(d => {
       const ds = localDateStr(d)
       row.push(shiftLabel(data[`${emp}::${ds}::pranzo`], 'pranzo') || '—')
-      row.push(shiftLabel(data[`${emp}::${ds}::cena`], 'cena') || '—')
+
+      const cenaVal = data[`${emp}::${ds}::cena`]
+      const cenaTime = shiftLabel(cenaVal, 'cena')
+      // Sotto l'orario aggiunge il numero di turno (1-7), più piccolo — non
+      // richiesto per il pranzo, che ha solo Q/W.
+      const cenaTurno = cenaVal && cenaVal !== 'F' && cenaVal in CENA_MAP ? cenaVal : null
+      row.push(cenaTurno ? `${cenaTime}\n${cenaTurno}` : (cenaTime || '—'))
     })
     return row
   })
@@ -146,13 +152,36 @@ function renderWeekTable(doc, dates, employees, data, startY, pageW, margin, nam
         }
       }
     },
+    // Le celle cena con turno (raw = "orario\nturno") vengono ridisegnate a
+    // mano per mostrare il numero di turno più piccolo sotto l'orario: la
+    // resa di default userebbe lo stesso corpo per entrambe le righe.
+    didDrawCell(hookData) {
+      if (hookData.section !== 'body') return
+      const raw = hookData.cell.raw
+      if (typeof raw !== 'string' || !raw.includes('\n')) return
+      const [timeStr, turnoStr] = raw.split('\n')
+      const { x, y, width, height } = hookData.cell
+      const ei = hookData.row.index
+      const { bg, fg } = EMP_COLORS[ei % EMP_COLORS.length]
+      const [br, bgn, bb] = hexToRgb(bg)
+      const [fr, fgn, fb] = hexToRgb(fg)
+
+      doc.setFillColor(br, bgn, bb)
+      doc.rect(x, y, width, height, 'F')
+      doc.setTextColor(fr, fgn, fb)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7.5)
+      doc.text(timeStr, x + width / 2, y + height / 2 - 0.6, { align: 'center', baseline: 'middle' })
+      doc.setFontSize(5)
+      doc.text(turnoStr, x + width / 2, y + height - 1.3, { align: 'center', baseline: 'alphabetic' })
+    },
     margin: { left: margin, right: margin },
   })
 
   return doc.lastAutoTable.finalY
 }
 
-function buildAndDownloadPDF(data, from, to, employees) {
+function buildAndDownloadPDF(data, from, to, employees, periodiDip) {
   const { jsPDF } = window.jspdf
   if (!jsPDF) { alert('Libreria PDF non caricata, riprova.'); return }
 
@@ -189,12 +218,19 @@ function buildAndDownloadPDF(data, from, to, employees) {
 
     let currentY = 13
     pageWeeks.forEach((weekDates) => {
+      // Un dipendente compare nella settimana solo se attivo in almeno uno dei
+      // suoi giorni (stesso criterio della griglia a schermo): fuori dal suo
+      // periodo di attività, o assente per tutta la settimana, la riga sparisce.
+      const weekEmployees = employees.filter(emp =>
+        weekDates.some(d => isActivePeriod(emp, localDateStr(d), periodiDip))
+      )
+      if (weekEmployees.length === 0) return
       doc.setFontSize(7.5)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(80, 80, 80)
       doc.text(`Settimana: ${fmtDate(weekDates[0])} – ${fmtDate(weekDates[weekDates.length-1])}`, margin, currentY + 3)
       doc.setTextColor(0, 0, 0)
-      currentY = renderWeekTable(doc, weekDates, employees, data, currentY + 5, pageW, margin, nameColW)
+      currentY = renderWeekTable(doc, weekDates, weekEmployees, data, currentY + 5, pageW, margin, nameColW)
       currentY += 6
     })
   })
@@ -303,7 +339,7 @@ async function buildAndDownloadICS(data, from, to, employees) {
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
-export default function ExportModal({ data, currentMonday, employees, onClose }) {
+export default function ExportModal({ data, currentMonday, employees, periodiDip, onClose }) {
   const monStr = localDateStr(currentMonday)
   const sunStr = localDateStr(addDays(currentMonday, 6))
 
@@ -313,7 +349,13 @@ export default function ExportModal({ data, currentMonday, employees, onClose })
   const [empMode, setEmpMode] = useState('uno')
   const [selEmp, setSelEmp] = useState(employees[0])
 
-  function getEmployees() { return empMode === 'tutti' ? employees : [selEmp] }
+  function getEmployees() {
+    if (empMode !== 'tutti') return [selEmp]
+    // Esclude chi non è mai attivo in tutto il periodo esportato (es. assente
+    // o fuori dal proprio periodo di attività): stesso criterio della griglia.
+    const dates = getDates(from, to)
+    return employees.filter(emp => dates.some(d => isActivePeriod(emp, localDateStr(d), periodiDip)))
+  }
 
   function handleModeChange(m) {
     setMode(m)
@@ -321,7 +363,7 @@ export default function ExportModal({ data, currentMonday, employees, onClose })
   }
 
   function doXLS() { buildAndDownloadXLS(data, from, to, getEmployees()); onClose() }
-  function doPDF() { buildAndDownloadPDF(data, from, to, getEmployees()); onClose() }
+  function doPDF() { buildAndDownloadPDF(data, from, to, getEmployees(), periodiDip); onClose() }
   async function doICS() { await buildAndDownloadICS(data, from, to, getEmployees()); onClose() }
 
   return (
