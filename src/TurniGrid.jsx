@@ -110,6 +110,8 @@ export default function TurniGrid({ isAdmin, onLogout }) {
   const pendingRef = useRef({})
   const hintRef = useRef(null)
   const figureHintRef = useRef(null)
+  const tableWrapRef = useRef(null)
+  const touchStartRef = useRef(null)
 
   const weekKey = toDateStr(currentMonday)
   const days = getWeekDays(currentMonday)
@@ -270,6 +272,33 @@ export default function TurniGrid({ isAdmin, onLogout }) {
     } else {
       setCurrentMonday(fn)
     }
+  }
+
+  // Swipe da smartphone per cambiare settimana. Sulla tabella (che su schermi
+  // stretti scorre già in orizzontale per vedere tutti i giorni) lo swipe
+  // cambia settimana solo se parte da un bordo dello scroll orizzontale,
+  // altrimenti si limiterebbe a scorrere la tabella invece di cambiare pagina.
+  function handleTableTouchStart(e) {
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY, scrollLeft: tableWrapRef.current?.scrollLeft ?? 0 }
+  }
+
+  function handleTableTouchEnd(e) {
+    const start = touchStartRef.current
+    touchStartRef.current = null
+    if (!start) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+
+    const el = tableWrapRef.current
+    const maxScroll = el ? el.scrollWidth - el.clientWidth : 0
+    const atLeftEdge = start.scrollLeft <= 2
+    const atRightEdge = start.scrollLeft >= maxScroll - 2
+
+    if (dx > 0 && atLeftEdge) changeWeek(m => addDays(m, -7))
+    else if (dx < 0 && atRightEdge) changeWeek(m => addDays(m, 7))
   }
 
   function handleChange(key, val) {
@@ -512,7 +541,12 @@ export default function TurniGrid({ isAdmin, onLogout }) {
           )}
 
           {!isWeekHidden && (
-            <div className={styles.tableWrap}>
+            <div
+              className={styles.tableWrap}
+              ref={tableWrapRef}
+              onTouchStart={handleTableTouchStart}
+              onTouchEnd={handleTableTouchEnd}
+            >
               <table className={styles.table}>
                 <thead>
                   <tr>
