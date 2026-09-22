@@ -338,6 +338,13 @@
   outline: none;
 }
 
+.formDateArrow {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #888;
+}
+
 .formNote {
   padding: 8px 10px;
   border: 1px solid #ccc;

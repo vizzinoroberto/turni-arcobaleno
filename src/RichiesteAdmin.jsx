@@ -38,7 +38,7 @@ export default function RichiesteAdmin({ onPendingCountChange, employees }) {
   const [motivoRifiuto, setMotivoRifiuto] = useState({})
   const [showMotivoFor, setShowMotivoFor] = useState(null)
   const [showFormVerbale, setShowFormVerbale] = useState(false)
-  const [newVerbale, setNewVerbale] = useState({ nome_dipendente: '', data: new Date().toISOString().slice(0,10), tipo: 'cambio_turno', note: '' })
+  const [newVerbale, setNewVerbale] = useState({ nome_dipendente: '', data: new Date().toISOString().slice(0,10), data_fine: new Date().toISOString().slice(0,10), tipo: 'cambio_turno', note: '' })
   const [verbaleLoading, setVerbaleLoading] = useState(false)
 
   const loadRichieste = useCallback(async () => {
@@ -429,11 +429,12 @@ export default function RichiesteAdmin({ onPendingCountChange, employees }) {
     await supabase.from('richieste_verbali').insert({
       nome_dipendente: newVerbale.nome_dipendente,
       data: newVerbale.data,
+      data_fine: newVerbale.data_fine && newVerbale.data_fine > newVerbale.data ? newVerbale.data_fine : newVerbale.data,
       tipo: newVerbale.tipo,
       note: newVerbale.note || null,
       stato: 'da_gestire',
     })
-    setNewVerbale({ nome_dipendente: '', data: new Date().toISOString().slice(0,10), tipo: 'cambio_turno', note: '' })
+    setNewVerbale({ nome_dipendente: '', data: new Date().toISOString().slice(0,10), data_fine: new Date().toISOString().slice(0,10), tipo: 'cambio_turno', note: '' })
     setShowFormVerbale(false)
     setVerbaleLoading(false)
     loadRichieste()
@@ -505,7 +506,19 @@ export default function RichiesteAdmin({ onPendingCountChange, employees }) {
                 type="date"
                 className={styles.formDate}
                 value={newVerbale.data}
-                onChange={e => setNewVerbale(prev => ({ ...prev, data: e.target.value }))}
+                onChange={e => setNewVerbale(prev => ({
+                  ...prev,
+                  data: e.target.value,
+                  data_fine: prev.data_fine && prev.data_fine < e.target.value ? e.target.value : prev.data_fine,
+                }))}
+              />
+              <span className={styles.formDateArrow}>→</span>
+              <input
+                type="date"
+                className={styles.formDate}
+                min={newVerbale.data}
+                value={newVerbale.data_fine}
+                onChange={e => setNewVerbale(prev => ({ ...prev, data_fine: e.target.value }))}
               />
               <select
                 className={styles.formSelect}
@@ -545,7 +558,9 @@ export default function RichiesteAdmin({ onPendingCountChange, employees }) {
                     <span className={styles.nome}>{r.nome_dipendente}</span>
                     <span className={styles.tipoBadge}>{tipoVerbaleLabel(r.tipo)}</span>
                   </div>
-                  <span className={styles.dataRichiesta}>{fmtDate(r.data)}</span>
+                  <span className={styles.dataRichiesta}>
+                    {r.data_fine && r.data_fine !== r.data ? `${fmtDate(r.data)} → ${fmtDate(r.data_fine)}` : fmtDate(r.data)}
+                  </span>
                 </div>
                 {r.note && (
                   <div className={styles.note}>
